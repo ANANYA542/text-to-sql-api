@@ -97,10 +97,124 @@ def create_and_seed_db() -> str:
 
     return str(DB_PATH)
 
+class VarianceAggregate:
+    def __init__(self):
+        self.values = []
+    def step(self, value):
+        if value is not None:
+            try:
+                self.values.append(float(value))
+            except (ValueError, TypeError):
+                pass
+    def finalize(self):
+        n = len(self.values)
+        if n <= 1:
+            return 0.0 if n == 1 else None
+        mean = sum(self.values) / n
+        return sum((x - mean) ** 2 for x in self.values) / (n - 1)
+
+class StddevAggregate:
+    def __init__(self):
+        self.values = []
+    def step(self, value):
+        if value is not None:
+            try:
+                self.values.append(float(value))
+            except (ValueError, TypeError):
+                pass
+    def finalize(self):
+        n = len(self.values)
+        if n <= 1:
+            return 0.0 if n == 1 else None
+        mean = sum(self.values) / n
+        var = sum((x - mean) ** 2 for x in self.values) / (n - 1)
+        import math
+        return math.sqrt(var)
+
+class VariancePopAggregate:
+    def __init__(self):
+        self.values = []
+    def step(self, value):
+        if value is not None:
+            try:
+                self.values.append(float(value))
+            except (ValueError, TypeError):
+                pass
+    def finalize(self):
+        n = len(self.values)
+        if n == 0:
+            return None
+        mean = sum(self.values) / n
+        return sum((x - mean) ** 2 for x in self.values) / n
+
+class StddevPopAggregate:
+    def __init__(self):
+        self.values = []
+    def step(self, value):
+        if value is not None:
+            try:
+                self.values.append(float(value))
+            except (ValueError, TypeError):
+                pass
+    def finalize(self):
+        n = len(self.values)
+        if n == 0:
+            return None
+        mean = sum(self.values) / n
+        var = sum((x - mean) ** 2 for x in self.values) / n
+        import math
+        return math.sqrt(var)
+
+def register_custom_functions(conn: sqlite3.Connection):
+    import math
+    
+    # Register scalar functions
+    def sqlite_log(x):
+        if x is None:
+            return None
+        try:
+            val = float(x)
+            if val <= 0:
+                return None
+            return math.log(val)
+        except Exception:
+            return None
+
+    def sqlite_exp(x):
+        if x is None:
+            return None
+        try:
+            return math.exp(float(x))
+        except Exception:
+            return None
+
+    def sqlite_ascii(x):
+        if not x:
+            return None
+        try:
+            s = str(x)
+            return ord(s[0]) if s else None
+        except Exception:
+            return None
+
+    conn.create_function("LOG", 1, sqlite_log)
+    conn.create_function("EXP", 1, sqlite_exp)
+    conn.create_function("ASCII", 1, sqlite_ascii)
+
+    # Register aggregate functions
+    conn.create_aggregate("VARIANCE", 1, VarianceAggregate)
+    conn.create_aggregate("VAR_SAMP", 1, VarianceAggregate)
+    conn.create_aggregate("VAR_POP", 1, VariancePopAggregate)
+    conn.create_aggregate("STDDEV", 1, StddevAggregate)
+    conn.create_aggregate("STDDEV_SAMP", 1, StddevAggregate)
+    conn.create_aggregate("STDDEV_POP", 1, StddevPopAggregate)
+
 def get_db_connection() -> sqlite3.Connection:
-    """Returns a connection to the persistent SQLite database."""
+    """Returns a connection to the persistent SQLite database with registered custom functions."""
     if not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
         create_and_seed_db()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    register_custom_functions(conn)
     return conn
+
