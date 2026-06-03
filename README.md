@@ -1,24 +1,24 @@
 # Enterprise Text-to-SQL Engine
 
-A high-performance FastAPI microservice designed to translate natural language questions into valid, executable SQLite queries against the **Beaver Database Benchmark** (97 tables, 5,787 queries).
+A high-performance FastAPI microservice designed to translate natural language questions into valid, executable SQLite queries against the Beaver Database Benchmark (97 tables, 5,787 queries).
 
 > **Key Milestone:** Achieved **86.00% Retrieval Recall@5** (target: >85%) and **96.67% Recall@10** with sub-700ms end-to-end latency.
 
 ---
 
-## 🧠 Thought Process & Evolution
+## Thought Process & Evolution
 
 The primary challenge of the Beaver dataset is scale: **97 tables** with hundreds of columns cannot fit into a standard LLM context window without causing context inflation, extreme latency, and hallucinated joins. The solution required a multi-stage retrieval-augmented generation (RAG) pipeline to isolate the correct 3–5 tables.
 
 ### Iterative Optimization Journey
 
 ```mermaid
-graph TD
-    A[1. Bi-Encoder Cosine ~45%] --> B[2. Fix CTE Parse Bug ~66%]
-    B --> C[3. Hybrid BM25 + Cosine ~70%]
-    C --> D[4. Cross-Encoder Rerank ~73%]
-    D --> E[5. Schema Graph Propagation ~78%]
-    E --> F[6. LLM Query Expansion + Boosts 86%]
+graph LR
+    A[1. Base Semantic: 45%] --> B[2. CTE Bugfix: 66%]
+    B --> C[3. Hybrid Search: 70%]
+    C --> D[4. Cross-Encoder: 73%]
+    D --> E[5. Schema Graph: 78%]
+    E --> F[6. LLM Expansion: 86%]
 ```
 
 | Iteration | Optimization Strategy | Recall@5 | Key Insight |
@@ -32,61 +32,41 @@ graph TD
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### End-to-End Pipeline
 
 ```mermaid
-flowchart TD
-    User([🗣️ User Question]) --> QueryExp[🔍 LLM Query Expansion]
-    QueryExp --> Retrieval[📊 Hybrid Retrieval Engine]
-    
-    subgraph Retrieval [Hybrid Retrieval Engine]
-        direction TB
-        BM25[BM25 Lexical Search]
-        BiEnc[Bi-Encoder Cosine Similarity]
-        RRF[Reciprocal Rank Fusion]
-        GraphProp[Schema Graph Score Propagation]
-        CrossEnc[Cross-Encoder Reranker]
-        
-        BM25 & BiEnc --> RRF
-        RRF --> GraphProp
-        GraphProp --> CrossEnc
-    end
-    
-    Retrieval --> PromptGen[📋 Contextual Prompt Builder]
-    PromptGen --> LLM[🤖 Groq LLM Generation]
-    LLM --> SQLValidate[⚡ SQL Syntax & Schema Validator]
-    SQLValidate --> SQLite[(🗄️ SQLite Database)]
-    SQLite --> Response([📨 Final JSON Response])
+graph TD
+    Question[User Question] --> Exp[LLM Query Expansion]
+    Exp --> Retrieve[Hybrid Retrieval BM25 + Vector]
+    Retrieve --> Rerank[Cross-Encoder Reranking]
+    Rerank --> Gen[Llama-3.1 SQL Generation]
+    Gen --> Validate[SQL Validation & Execution]
+    Validate --> Response[JSON Response]
 ```
 
 ### Execution & Validation Flow
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant User as Client
-    participant API as FastAPI App
-    participant RE as Retrieval Engine
-    participant LLM as Groq (Llama-3.1)
-    participant DB as SQLite DB
+    participant Client
+    participant API
+    participant LLM
+    participant DB
 
-    User->>API: POST /generate-sql {question}
-    API->>RE: retrieve_tables(question, top_k=5)
-    RE->>RE: Expand query -> Retrieve (BM25 + Cosine) -> Rerank (Cross-Encoder)
-    RE-->>API: Top-5 Tables + Reasoning
-    API->>LLM: Generate SQL (Prompt: Schema context + Few-shot examples)
-    LLM-->>API: Generated SQL String
-    API->>API: Parse & Verify Syntax
-    API->>DB: Execute Query (Check runtime errors)
-    DB-->>API: Query Result Rows
-    API-->>User: JSON Response {sql, retrieved_tables, exec_success, data}
+    Client->>API: POST /generate-sql
+    API->>API: Hybrid Retrieval (Top 5 Tables)
+    API->>LLM: Generate SQL using Schema Context
+    LLM-->>API: SQL Query
+    API->>DB: Validate & Execute SQL
+    DB-->>API: Data Rows
+    API-->>Client: JSON Response
 ```
 
 ---
 
-## ⚡ Tech Stack & Performance
+## Tech Stack & Performance
 
 | Layer | Component / Tool | Performance Metric | Score |
 | :--- | :--- | :--- | :--- |
@@ -98,7 +78,7 @@ sequenceDiagram
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```text
 text-to-sql/
@@ -122,7 +102,7 @@ text-to-sql/
 
 ---
 
-## 🚦 API Reference & Verification
+## API Reference & Verification
 
 ### 1. System Health Check
 `GET /health` verifies DB connections, model weights, and device allocation (CPU/MPS).
@@ -146,7 +126,7 @@ Swagger interface available at `/docs`.
 
 ---
 
-## 🛠️ Quick Start
+## Quick Start
 
 ```bash
 # Clone the repository
