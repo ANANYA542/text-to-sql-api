@@ -32,6 +32,30 @@ graph LR
 
 ---
 
+# Insights Learned from the BEAVER Paper
+
+Translating natural language questions to SQL on large-scale databases is fundamentally a systems grounding problem, not just an LLM capability problem. Implementing this solution against the Beaver dataset highlighted several practical engineering constraints and design patterns:
+
+### 1. The Grounding Bottleneck
+Enterprise schemas with dozens or hundreds of tables (like the 97 tables in Beaver) break naive zero-shot prompts. Injecting the entire database schema into the LLM context leads to token inflation, severe latency spikes, and severe join hallucinations. Therefore, the task is primarily a **schema retrieval and grounding** problem: if the correct tables are not identified in the top 5 candidates, the downstream generator has a 0% chance of producing a valid query.
+
+### 2. Limitations of Pure Semantic Search
+Vanilla vector embeddings (cosine similarity over bi-encoders) struggle with the sparse, heavily abbreviated naming structures typical of enterprise databases (e.g., `SIS_ADMIN_DEPARTMENT` vs. `STUDENT_DEPARTMENT`). While semantic models capture the broad intent, they fail on exact matches for acronyms, table IDs, and code abbreviations. This necessitated a **hybrid search** architecture that fuses BM25 lexical retrieval (for exact keywords/acronyms) with bi-encoder cosine similarity to bridge the semantic gap.
+
+### 3. Cross-Encoder Precision
+Bi-encoders represent queries and schemas as separate vectors, meaning they cannot model token-level interactions between the question and the schema columns. Adding a **cross-encoder reranker** allows joint query-schema encoding, significantly improving precision by filtering out false-positive semantic matches that survive first-stage retrieval.
+
+### 4. Schema Enrichment & Score Propagation
+Raw database schemas are semantically sparse. Manually enriching the schema with explicit table descriptions and relationship metadata (e.g., foreign key linkages and category designations) aligns natural language queries with relational structures. We propagate retrieval scores along these schema relationships so that if a primary table is matched, its key foreign-key neighbors receive a relative boost, ensuring complete query execution context.
+
+### 5. Metric Distortion from CTE Aliases
+A major observation during benchmarking was that naive SQL parsers count Common Table Expression (CTE) aliases (e.g., `inner_cte`) as physical schema tables. This inflates recall metrics falsely during evaluation. Discerning physical tables from CTE structures is crucial for establishing a correct, reliable evaluation baseline.
+
+### 6. Retrieval Calibration & Validation Loops
+To prevent downstream LLM confusion, retrieval scores must be calibrated. Applying sigmoidal temperature calibration on reranker logits transforms raw similarity values into realistic confidence scores (0.0 to 1.0). This feeds directly into a robust validation loop that tests query syntactical correctness and database execution feedback, allowing us to debug failures systematically.
+
+---
+
 ## System Architecture
 
 ### End-to-End Pipeline
