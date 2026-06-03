@@ -7,9 +7,8 @@ Workflow:
 2. For each query, parse the ground truth SQL using sqlglot:
    - Extract all defined Common Table Expression (CTE) names from the WITH clause.
    - Extract all referenced table names, and exclude CTEs.
-   - Query the local active FastAPI Retrieval API (/health) to get the list of 97 valid database tables.
    - Filter the parsed gold tables to keep only tables that actually exist in the database schema.
-3. Query the local active FastAPI Retrieval API (/retrieve) to retrieve the top 5 tables.
+3. Run RetrievalEngine.retrieve(question, top_k=5) directly.
 4. Calculate Recall@5 per question:
    Recall@5 = (number of real gold tables present in top 5) / (total real gold tables)
 5. Average Recall@5 across all processed queries (excluding queries with zero real gold tables).
@@ -18,10 +17,7 @@ Workflow:
 
 import os
 from pathlib import Path
-import json
 import logging
-import urllib.request
-import urllib.error
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CACHE_ROOT = PROJECT_ROOT / ".cache" / "huggingface"
@@ -34,10 +30,13 @@ from datasets import load_dataset
 import sqlglot
 from sqlglot import exp
 
+# Import the refactored Retrieval components
+from app.retrieval.schema_loader import load_beaver_schema, load_beaver_queries
+from app.retrieval.engine import RetrievalEngine
+
 # Set up clean logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
-BASE_URL = os.getenv("RETRIEVAL_API_URL", "http://localhost:8000")
 
 def extract_tables_and_ctes(sql_query: str) -> tuple[set[str], set[str]]:
     """
@@ -71,7 +70,6 @@ def extract_tables_and_ctes(sql_query: str) -> tuple[set[str], set[str]]:
         words = sql_query.upper().replace('`', '').replace('"', '').split()
         for i, word in enumerate(words):
             if word == "WITH":
-                # Very simple heuristic for CTE name following WITH
                 if i + 1 < len(words):
                     ctes.add(words[i+1].strip())
             elif word in ("FROM", "JOIN") and i + 1 < len(words):
@@ -80,76 +78,19 @@ def extract_tables_and_ctes(sql_query: str) -> tuple[set[str], set[str]]:
                     tables.add(next_word.split('.')[-1])
         return tables, ctes
 
-def get_valid_schema_tables() -> set[str]:
-    """
-    Retrieves the list of valid schema table names loaded in the running FastAPI server.
-    """
-    url = f"{BASE_URL}/health"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res = json.loads(response.read().decode())
-            # If the endpoint doesn't explicitly return all table names, we can query retrieve once
-            # to trigger load if needed, or fallback.
-            # But wait, let's call /retrieve with a dummy query to fetch a sample to get table names
-            # from retrieval engine in python context if health doesn't give them.
-            # However, we can construct the list of 97 tables from the RetrievalEngine inside retrieve.
-            return None
-    except Exception as e:
-        logger.error(f"Failed to query server health: {e}")
-        return None
-
-def get_tables_from_api_retrieve() -> set[str]:
-    """
-    Retrieves the exact list of 97 schema tables by hitting a special check or fallback.
-    Since we know the 97 tables are physical database tables, let's load them via the loader
-    or fetch them from a test query retrieval.
-    """
-    # Simply load beaver-table directly using datasets since we have HF logged in!
-    try:
-        table_ds = load_dataset("beaverbench/beaver-table", split="dw")
-        return {row["table_name"].upper() for row in table_ds}
-    except Exception as e:
-        logger.error(f"Could not load schema tables list from HF: {e}")
-        # Return hardcoded typical Beaver DW tables list if offline fallback needed
-        return set()
-
-def query_retrieval_api(question: str, top_k: int = 5) -> list[str]:
-    """
-    Calls the locally running FastAPI retrieval endpoint to fetch the top_k tables.
-    """
-    url = f"{BASE_URL}/retrieve"
-    data = json.dumps({"question": question, "top_k": top_k}).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            res = json.loads(response.read().decode())
-            return res.get("retrieved_tables", [])
-    except urllib.error.URLError as e:
-        logger.error(f"Failed to connect to local API server at {url}: {e}")
-        logger.info(
-            f"Please make sure the FastAPI server is running (e.g. uvicorn main:app --port 8000, or set RETRIEVAL_API_URL={BASE_URL})"
-        )
-        raise RuntimeError("FastAPI server connection failed") from e
-
 def run_evaluation():
-    logger.info("Starting Text-to-SQL Retrieval Accuracy Evaluation...")
+    logger.info("Starting Text-to-SQL Retrieval Accuracy Evaluation (Offline Module Check)...")
 
-    # Fetch valid schema tables
-    valid_schema_tables = get_tables_from_api_retrieve()
+    # Load and enrich Beaver schemas
+    schema = load_beaver_schema(split="dw")
+    valid_schema_tables = {name.upper() for name in schema.keys()}
     logger.info(f"Loaded {len(valid_schema_tables)} valid physical schema tables.")
 
+    # Initialize the retrieval engine directly
+    engine = RetrievalEngine(schema)
+
     # 1. Load the Beaver query dataset (dw split) from Hugging Face
-    logger.info("Loading beaver-query dataset split=dw...")
-    try:
-        query_ds = load_dataset("beaverbench/beaver-query", split="dw")
-    except Exception as e:
-        logger.error(f"Failed to load Hugging Face dataset: {e}")
-        return
+    query_ds = load_beaver_queries(split="dw")
 
     # Slice first 50 queries having ground truth SQL answers
     eval_queries = []
@@ -173,12 +114,12 @@ def run_evaluation():
         # Parse tables and CTEs from gold SQL
         raw_parsed_tables, ctes = extract_tables_and_ctes(gold_sql)
 
-        # 1. Filter out CTEs
+        # Filter out CTEs
         gold_before_filter = list(raw_parsed_tables)
         ctes_removed = raw_parsed_tables.intersection(ctes)
         tables_no_ctes = raw_parsed_tables - ctes
 
-        # 2. Keep only tables that actually exist in the physical schema
+        # Keep only tables that actually exist in the physical schema
         gold_tables = {t for t in tables_no_ctes if t in valid_schema_tables}
         non_existent_tables = tables_no_ctes - gold_tables
 
@@ -188,11 +129,8 @@ def run_evaluation():
             continue
 
         # Get retrieved tables from API
-        try:
-            retrieved_tables = query_retrieval_api(question, top_k=5)
-        except Exception:
-            logger.error("Stopping evaluation due to API connection failures.")
-            return
+        ret_val = engine.retrieve(question, top_k=5)
+        retrieved_tables = ret_val.get("retrieved_tables", [])
 
         # Normalize retrieved table names to uppercase
         retrieved_upper = [t.upper() for t in retrieved_tables]
@@ -218,7 +156,7 @@ def run_evaluation():
         logger.error("No queries were successfully evaluated.")
         return
 
-    # 3. Print average Recall@5 score
+ 
     avg_recall_percentage = (total_recall / len(results)) * 100
     print("\n" + "="*80)
     print(f"EVALUATION COMPLETE: FINAL Recall@5 = {avg_recall_percentage:.2f}%")

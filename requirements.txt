@@ -9,3 +9,4 @@ datasets==3.0.1
 torch==2.2.2
 transformers==4.44.2
 sqlglot==25.24.1
+requests==2.32.3

@@ -12,6 +12,7 @@ venv/
 
 # Mac
 .DS_Store
+Screenshot *.png
 
 # VSCode
 .vscode/
