@@ -23,8 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CACHE_ROOT = PROJECT_ROOT / ".cache" / "huggingface"
 os.environ.setdefault("HF_HOME", str(CACHE_ROOT))
 os.environ.setdefault("HF_DATASETS_CACHE", str(CACHE_ROOT / "datasets"))
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "0")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 
 from datasets import load_dataset
 import sqlglot
