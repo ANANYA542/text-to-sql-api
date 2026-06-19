@@ -68,14 +68,14 @@ const LogsPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-[#1F2421]">Structured Logs</h2>
-          <p className="text-xs text-[#5C625E] mt-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Structured Logs</h2>
+          <p className="text-xs text-slate-500 mt-1">
             Audit and debug production telemetry logs parsed directly from pipeline JSONL cache.
           </p>
         </div>
         <button
           onClick={fetchLogs}
-          className="bg-[#FAF8F2] hover:bg-[#EEE7DA]/50 text-[#5C625E] border border-[#EEE7DA] text-xs px-3 py-2 rounded flex items-center gap-1.5 transition-all cursor-pointer font-medium"
+          className="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer font-medium"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh Stream
@@ -83,24 +83,24 @@ const LogsPage: React.FC = () => {
       </div>
 
       {/* Filters Row */}
-      <div className="flex flex-wrap gap-4 items-center bg-[#F5F1E8]/40 border border-[#EEE7DA] p-4 rounded-lg">
+      <div className="flex flex-wrap gap-4 items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#8E9490]" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search query logs..."
-            className="w-full pl-9 pr-4 py-2 bg-[#FAF8F2] border border-[#EEE7DA] rounded-md text-xs text-[#1F2421] placeholder-[#8E9490] focus:outline-none focus:border-[#5A738E] transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold text-[#8E9490] tracking-wider">Status:</span>
+          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status:</span>
           <select
             value={statusFilter}
             onChange={(e: any) => setStatusFilter(e.target.value)}
-            className="bg-[#FAF8F2] border border-[#EEE7DA] px-2 py-1.5 rounded text-xs text-[#1F2421] focus:outline-none focus:border-[#5A738E]"
+            className="bg-slate-50 border border-slate-200 px-2 py-1.5 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Logs</option>
             <option value="valid">Valid Syntax Only</option>
@@ -111,9 +111,9 @@ const LogsPage: React.FC = () => {
 
       {/* Logs Render Container */}
       {loading && logs.length === 0 ? (
-        <div className="text-center py-12 text-xs text-[#5C625E]">Streaming pipeline logs...</div>
+        <div className="text-center py-12 text-xs text-slate-500">Streaming pipeline logs...</div>
       ) : filteredLogs.length === 0 ? (
-        <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-12 text-center text-xs text-[#8E9490]">
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-xs text-slate-400 shadow-sm">
           No query logs matching filters. Execute a workspace query first.
         </div>
       ) : (
@@ -124,7 +124,7 @@ const LogsPage: React.FC = () => {
             return (
               <div 
                 key={idx}
-                className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg overflow-hidden transition-all hover:border-[#8E9490]/50"
+                className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all hover:border-slate-300 shadow-sm"
               >
                 {/* Header card click toggle */}
                 <div 
@@ -132,16 +132,16 @@ const LogsPage: React.FC = () => {
                   className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none"
                 >
                   <div className="flex flex-col gap-1 min-w-0">
-                    <span className="text-xs font-semibold text-[#1F2421] truncate max-w-lg" title={log.question}>
+                    <span className="text-xs font-semibold text-slate-900 truncate max-w-lg" title={log.question}>
                       {log.question}
                     </span>
-                    <div className="flex items-center gap-2 text-[10px] text-[#8E9490] font-medium">
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
                       <span className="font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
                       <span>·</span>
                       <span className="capitalize">{log.model_used.replace('_', ' ')}</span>
                       <span>·</span>
                       <span className="flex items-center gap-0.5">
-                        <Clock className="w-3 h-3 text-[#5A738E]" />
+                        <Clock className="w-3 h-3 text-blue-500" />
                         {log.latency_ms.toFixed(0)}ms
                       </span>
                     </div>
@@ -151,24 +151,24 @@ const LogsPage: React.FC = () => {
                     {log.is_valid !== undefined && (
                       <span className={`text-[8.5px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
                         log.is_valid 
-                          ? 'bg-[#6E8B7E]/5 border-[#6E8B7E]/30 text-[#6E8B7E]' 
-                          : 'bg-[#A0522D]/5 border-[#A0522D]/30 text-[#A0522D]'
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                          : 'bg-red-50 border-red-200 text-red-700'
                       }`}>
                         {log.is_valid ? 'Valid Syntax' : 'Syntax Error'}
                       </span>
                     )}
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-[#8E9490]" /> : <ChevronDown className="w-4 h-4 text-[#8E9490]" />}
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                   </div>
                 </div>
 
                 {/* Collapsible Details Panel */}
                 {isExpanded && (
-                  <div className="border-t border-[#EEE7DA] p-4 bg-[#FAF8F2] space-y-4 text-xs">
+                  <div className="border-t border-slate-100 p-4 bg-slate-50 space-y-4 text-xs">
                     {/* Generated SQL query */}
                     {log.sql_generated && (
                       <div className="space-y-1.5">
-                        <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block">Generated SQL</span>
-                        <pre className="bg-[#F5F1E8]/40 border border-[#EEE7DA] p-3 rounded font-mono text-[11px] text-[#1F2421] whitespace-pre-wrap break-all">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Generated SQL</span>
+                        <pre className="bg-white border border-slate-200 p-3 rounded-lg font-mono text-[11px] text-slate-800 whitespace-pre-wrap break-all">
                           {log.sql_generated}
                         </pre>
                       </div>
@@ -177,8 +177,8 @@ const LogsPage: React.FC = () => {
                     {/* Parser Error report */}
                     {log.parsing_errors && (
                       <div className="space-y-1.5">
-                        <span className="text-[10px] uppercase font-semibold text-[#A0522D] tracking-wider block">Parsing Error details</span>
-                        <div className="bg-[#A0522D]/5 border border-[#A0522D]/30 text-[#A0522D] p-3 rounded font-mono text-[11px]">
+                        <span className="text-[10px] uppercase font-semibold text-red-600 tracking-wider block">Parsing Error details</span>
+                        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg font-mono text-[11px]">
                           {log.parsing_errors}
                         </div>
                       </div>
@@ -187,14 +187,14 @@ const LogsPage: React.FC = () => {
                     {/* Latency breakdown stats */}
                     {log.latency_breakdown && (
                       <div className="space-y-1.5">
-                        <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block">Stage Latencies</span>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-[#F5F1E8]/20 border border-[#EEE7DA]/50 p-3 rounded">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Stage Latencies</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white border border-slate-200 p-3 rounded-lg">
                           {Object.entries(log.latency_breakdown).map(([stage, val]) => (
                             <div key={stage} className="space-y-0.5">
-                              <span className="text-[9px] uppercase tracking-wide text-[#8E9490] block truncate">
+                              <span className="text-[9px] uppercase tracking-wide text-slate-400 block truncate">
                                 {stage.replace('_ms', '').replace(/_/g, ' ')}
                               </span>
-                              <span className="font-mono text-xs font-semibold text-[#5C625E]">{Math.round(val)}ms</span>
+                              <span className="font-mono text-xs font-semibold text-slate-600">{Math.round(val)}ms</span>
                             </div>
                           ))}
                         </div>
@@ -203,11 +203,11 @@ const LogsPage: React.FC = () => {
 
                     {/* Raw JSON Payload */}
                     <div className="space-y-1.5">
-                      <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block flex items-center gap-1">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block flex items-center gap-1">
                         <Terminal className="w-3.5 h-3.5" />
                         Raw Telemetry JSON
                       </span>
-                      <pre className="bg-[#FAF8F2] border border-[#EEE7DA] p-3 rounded font-mono text-[10px] text-[#5C625E] overflow-x-auto whitespace-pre">
+                      <pre className="bg-white border border-slate-200 p-3 rounded-lg font-mono text-[10px] text-slate-600 overflow-x-auto whitespace-pre">
                         {JSON.stringify(log, null, 2)}
                       </pre>
                     </div>

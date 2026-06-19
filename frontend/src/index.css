@@ -2,25 +2,25 @@
 @import "tailwindcss";
 
 :root {
-  /* Warm Beige Palette */
-  --bg-primary: #FAF8F2;
-  --bg-secondary: #F5F1E8;
-  --bg-tertiary: #EEE7DA;
-  --border-muted: rgba(200, 190, 175, 0.3);
-  --border-hover: rgba(90, 115, 142, 0.4);
+  /* Premium Slate & Cool Gray Palette */
+  --bg-primary: #F8FAFC; /* Clean Slate-50 */
+  --bg-secondary: #FFFFFF; /* Pure White */
+  --bg-tertiary: #E2E8F0; /* Clean Slate-200 */
+  --border-muted: rgba(226, 232, 240, 0.8);
+  --border-hover: rgba(59, 130, 246, 0.4);
   
   /* Text & Accents */
-  --text-primary: #1F2421;
-  --text-secondary: #5C625E;
-  --text-muted: #8E9490;
-  --accent: #5A738E; /* Muted blue */
-  --accent-hover: #43586F;
-  --accent-light: rgba(90, 115, 142, 0.08);
+  --text-primary: #0F172A; /* Slate-900 */
+  --text-secondary: #475569; /* Slate-600 */
+  --text-muted: #94A3B8; /* Slate-400 */
+  --accent: #2563EB; /* Premium Electric Blue (Blue-600) */
+  --accent-hover: #1D4ED8; /* Blue-700 */
+  --accent-light: rgba(37, 99, 235, 0.08);
   
   /* Statuses */
-  --success: #6E8B7E;
-  --warning: #C19A6B;
-  --error: #A0522D;
+  --success: #10B981; /* Emerald-500 */
+  --warning: #F59E0B; /* Amber-500 */
+  --error: #EF4444; /* Red-500 */
 
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

@@ -126,8 +126,8 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Editorial Title */}
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-[#1F2421]">Workspace</h2>
-        <p className="text-xs text-[#5C625E] mt-1">
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Workspace</h2>
+        <p className="text-xs text-slate-500 mt-1">
           Translate natural language queries into executable SQL queries and trace retrieval heuristics.
         </p>
       </div>
@@ -135,11 +135,11 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Side: Input Panel */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490]">Natural Language Query</h3>
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Natural Language Query</h3>
             
             <textarea
-              className="w-full h-32 p-4 bg-[#FAF8F2] border border-[#EEE7DA] rounded-lg text-sm text-[#1F2421] placeholder-[#8E9490] focus:outline-none focus:border-[#5A738E] transition-all resize-none font-sans"
+              className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none font-sans"
               placeholder="Describe what data you want to retrieve from the Beaver database..."
               value={currentQuestion}
               onChange={(e) => setCurrentQuestion(e.target.value)}
@@ -149,21 +149,21 @@ const Dashboard: React.FC = () => {
               <button
                 onClick={runPipeline}
                 disabled={pipelineStatus.step !== 'idle' && pipelineStatus.step !== 'complete' && pipelineStatus.step !== 'failed'}
-                className="bg-[#5A738E] hover:bg-[#43586F] text-[#FAF8F2] font-medium text-xs px-4 py-2.5 rounded transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Generate SQL
               </button>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-[#EEE7DA]">
-              <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block">Suggested Queries</span>
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Suggested Queries</span>
               <div className="space-y-1.5">
                 {exampleQueries.map((q, idx) => (
                   <button
                     key={idx}
                     onClick={() => setCurrentQuestion(q)}
-                    className="w-full text-left text-xs text-[#5C625E] hover:text-[#1F2421] hover:bg-[#EEE7DA]/50 px-2 py-1.5 rounded transition-all truncate"
+                    className="w-full text-left text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 px-2 py-1.5 rounded transition-all truncate"
                   >
                     {q}
                   </button>
@@ -174,10 +174,10 @@ const Dashboard: React.FC = () => {
 
           {/* Pipeline Trace Visualizer */}
           {pipelineStatus.step !== 'idle' && (
-            <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490]">Pipeline Execution Trace</h3>
-                <span className="text-[10px] font-mono text-[#5C625E]">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pipeline Execution Trace</h3>
+                <span className="text-[10px] font-mono text-slate-500">
                   {pipelineStatus.step === 'complete' ? 'Success' : pipelineStatus.step === 'failed' ? 'Error' : 'Running'}
                 </span>
               </div>
@@ -196,25 +196,25 @@ const Dashboard: React.FC = () => {
                   const currentIdx = stepOrder.indexOf(pipelineStatus.step)
                   const stepIdx = stepOrder.indexOf(step.id)
                   
-                  let stateStyle = 'bg-[#FAF8F2] border-[#EEE7DA] text-[#8E9490]'
+                  let stateStyle = 'bg-slate-50 border-slate-200 text-slate-400'
                   if (pipelineStatus.step === 'failed' && currentIdx === stepIdx) {
-                    stateStyle = 'bg-[#A0522D]/10 border-[#A0522D] text-[#A0522D]'
+                    stateStyle = 'bg-red-50 border-red-200 text-red-600'
                   } else if (currentIdx === stepIdx) {
-                    stateStyle = 'bg-[#C19A6B]/10 border-[#C19A6B] text-[#C19A6B] animate-pulse'
+                    stateStyle = 'bg-amber-50 border-amber-300 text-amber-700 animate-pulse'
                   } else if (currentIdx > stepIdx || pipelineStatus.step === 'complete') {
-                    stateStyle = 'bg-[#6E8B7E]/10 border-[#6E8B7E]/40 text-[#6E8B7E]'
+                    stateStyle = 'bg-emerald-50 border-emerald-200 text-emerald-700'
                   }
 
                   return (
-                    <div key={step.id} className={`border p-3 rounded text-center transition-all ${stateStyle}`}>
+                    <div key={step.id} className={`border p-3 rounded-lg text-center transition-all ${stateStyle}`}>
                       <div className="text-[10px] font-semibold tracking-tight">{step.label}</div>
                     </div>
                   )
                 })}
               </div>
 
-              <div className="text-[11px] text-[#5C625E] font-medium bg-[#FAF8F2] border border-[#EEE7DA] p-3 rounded flex items-center gap-2">
-                <Cpu className="w-3.5 h-3.5 text-[#5A738E] shrink-0" />
+              <div className="text-[11px] text-slate-600 font-medium bg-slate-50 border border-slate-200 p-3 rounded-lg flex items-center gap-2">
+                <Cpu className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                 <span>{pipelineStatus.message}</span>
               </div>
             </div>
@@ -222,23 +222,23 @@ const Dashboard: React.FC = () => {
 
           {/* Database Results Grid */}
           {(dbRows || dbError || isExecutingDb) && (
-            <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490] flex items-center gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                   <Terminal className="w-3.5 h-3.5" />
                   Database Query Output (First 100 Rows)
                 </h3>
               </div>
 
               {isExecutingDb && (
-                <div className="flex items-center justify-center py-12 text-xs text-[#5C625E] gap-2">
-                  <RefreshCw className="w-4 h-4 animate-spin text-[#5A738E]" />
+                <div className="flex items-center justify-center py-12 text-xs text-slate-500 gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                   Executing query on SQLite beaver_dw.db...
                 </div>
               )}
 
               {dbError && (
-                <div className="bg-[#A0522D]/10 border border-[#A0522D]/40 p-4 rounded text-xs text-[#A0522D] flex items-start gap-2">
+                <div className="bg-red-50 border border-red-200 p-4 rounded-lg text-xs text-red-600 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold block mb-0.5">Execution Failed</span>
@@ -248,30 +248,30 @@ const Dashboard: React.FC = () => {
               )}
 
               {dbRows && dbCols && !isExecutingDb && (
-                <div className="overflow-x-auto border border-[#EEE7DA] rounded-lg max-h-96">
+                <div className="overflow-x-auto border border-slate-200 rounded-lg max-h-96">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-[#FAF8F2] sticky top-0 border-b border-[#EEE7DA]">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200">
                       <tr>
                         {dbCols.map((col, idx) => (
-                          <th key={idx} className="p-3 font-semibold text-[#1F2421] tracking-tight whitespace-nowrap">
+                          <th key={idx} className="p-3 font-semibold text-slate-700 tracking-tight whitespace-nowrap">
                             {col}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="bg-[#FAF8F2]/40 divide-y divide-[#EEE7DA]/50">
-                      {dbRows.length === 0 ? (
+                    <tbody className="bg-white divide-y divide-slate-100">
+                       {dbRows.length === 0 ? (
                         <tr>
-                          <td colSpan={dbCols.length} className="p-8 text-center text-[#8E9490]">
+                          <td colSpan={dbCols.length} className="p-8 text-center text-slate-400">
                             Query execution returned 0 rows.
                           </td>
                         </tr>
                       ) : (
                         dbRows.map((row, rowIdx) => (
-                          <tr key={rowIdx} className="hover:bg-[#EEE7DA]/20 transition-all">
+                          <tr key={rowIdx} className="hover:bg-slate-50 transition-all">
                             {row.map((val: any, colIdx: number) => (
-                              <td key={colIdx} className="p-3 text-[#5C625E] font-mono text-[11px] whitespace-nowrap max-w-[250px] truncate" title={String(val)}>
-                                {val === null ? <span className="text-[#8E9490] italic">null</span> : String(val)}
+                              <td key={colIdx} className="p-3 text-slate-600 font-mono text-[11px] whitespace-nowrap max-w-[250px] truncate" title={String(val)}>
+                                {val === null ? <span className="text-slate-400 italic">null</span> : String(val)}
                               </td>
                             ))}
                           </tr>
@@ -287,11 +287,11 @@ const Dashboard: React.FC = () => {
 
         {/* Right Side: Output SQL & Details Panel */}
         <div className="space-y-6">
-          <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-[#EEE7DA] pb-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490]">Output Panel</h3>
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Output Panel</h3>
               {executionResult?.confidence !== undefined && (
-                <span className="bg-[#6E8B7E]/10 border border-[#6E8B7E]/30 text-[#6E8B7E] text-[10px] px-2 py-0.5 rounded font-mono font-medium">
+                <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-mono font-medium">
                   Conf: {Math.round(executionResult.confidence * 100)}%
                 </span>
               )}
@@ -300,18 +300,18 @@ const Dashboard: React.FC = () => {
             {/* Generated SQL query with syntax-coloring */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider">Generated SQL</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Generated SQL</span>
                 {executionResult?.sql && (
-                  <button onClick={handleCopy} className="text-[#5C625E] hover:text-[#1F2421] transition-all cursor-pointer">
-                    {copied ? <Check className="w-3.5 h-3.5 text-[#6E8B7E]" /> : <Clipboard className="w-3.5 h-3.5" />}
+                  <button onClick={handleCopy} className="text-slate-400 hover:text-slate-700 transition-all cursor-pointer">
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Clipboard className="w-3.5 h-3.5" />}
                   </button>
                 )}
               </div>
-              <div className="bg-[#FAF8F2] border border-[#EEE7DA] p-4 rounded-lg font-mono text-xs overflow-x-auto min-h-[120px] text-[#1F2421] relative">
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg font-mono text-xs overflow-x-auto min-h-[120px] text-slate-800 relative">
                 {executionResult?.sql ? (
                   <pre className="whitespace-pre-wrap break-all">{executionResult.sql}</pre>
                 ) : (
-                  <span className="text-[#8E9490] italic text-[11px] block mt-6 text-center">
+                  <span className="text-slate-400 italic text-[11px] block mt-6 text-center">
                     SQL query will appear here once generated...
                   </span>
                 )}
@@ -321,13 +321,13 @@ const Dashboard: React.FC = () => {
             {/* Syntax Validation report */}
             {executionResult && (
               <div className="space-y-2">
-                <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block">Syntax Validation</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Syntax Validation</span>
                 {executionResult.is_valid_syntax ? (
-                  <div className="border border-[#6E8B7E]/30 bg-[#6E8B7E]/5 text-[#6E8B7E] p-3.5 rounded text-xs font-medium">
+                  <div className="border border-emerald-200 bg-emerald-50/50 text-emerald-700 p-3.5 rounded-lg text-xs font-medium">
                     ✓ AST Syntax verified & validated
                   </div>
                 ) : (
-                  <div className="border border-[#A0522D]/30 bg-[#A0522D]/5 text-[#A0522D] p-3.5 rounded text-xs">
+                  <div className="border border-red-200 bg-red-50/50 text-red-700 p-3.5 rounded-lg text-xs">
                     <span className="font-semibold block mb-1">✕ Validation Error</span>
                     <p className="text-[10px] font-mono leading-relaxed">{executionResult.parsing_errors || 'Invalid query syntax.'}</p>
                   </div>
@@ -338,12 +338,12 @@ const Dashboard: React.FC = () => {
             {/* Context tables used */}
             {executionResult?.retrieved_tables && executionResult.retrieved_tables.length > 0 && (
               <div className="space-y-2.5">
-                <span className="text-[10px] uppercase font-semibold text-[#8E9490] tracking-wider block">Referenced Context Tables</span>
+                <span className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block">Referenced Context Tables</span>
                 <div className="space-y-1.5">
                   {executionResult.retrieved_tables.map((table: string) => (
-                    <div key={table} className="flex items-center justify-between text-xs bg-[#FAF8F2] border border-[#EEE7DA] px-3 py-2 rounded">
-                      <span className="font-mono text-[#5C625E] font-medium">{table}</span>
-                      <span className="text-[10px] text-[#8E9490]">Active</span>
+                    <div key={table} className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">
+                      <span className="font-mono text-slate-700 font-medium">{table}</span>
+                      <span className="text-[10px] text-slate-400">Active</span>
                     </div>
                   ))}
                 </div>

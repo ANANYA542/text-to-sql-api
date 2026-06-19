@@ -38,12 +38,12 @@ const MLDashboard: React.FC = () => {
     return (
       <div key={name} className="space-y-1.5">
         <div className="flex justify-between text-xs">
-          <span className="font-mono text-[#5C625E] font-medium">{name}</span>
-          <span className="font-mono text-[#1F2421] font-semibold">{(val * 100).toFixed(2)}%</span>
+          <span className="font-mono text-slate-600 font-medium">{name}</span>
+          <span className="font-mono text-slate-900 font-semibold">{(val * 100).toFixed(2)}%</span>
         </div>
-        <div className="h-2 w-full bg-[#FAF8F2] border border-[#EEE7DA] rounded-full overflow-hidden">
+        <div className="h-2 w-full bg-slate-50 border border-slate-200 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-[#5A738E] rounded-full transition-all duration-1000"
+            className="h-full bg-blue-600 rounded-full transition-all duration-1000"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -55,46 +55,46 @@ const MLDashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Page Header */}
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-[#1F2421]">Feature Space</h2>
-        <p className="text-xs text-[#5C625E] mt-1">
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Feature Space</h2>
+        <p className="text-xs text-slate-500 mt-1">
           Inspect LTR model parameter details and actual feature contributions extracted from serialized model weights.
         </p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-xs text-[#5C625E]">Loading model parameters...</div>
+        <div className="text-center py-12 text-xs text-slate-500">Loading model parameters...</div>
       ) : !activeRun ? (
-        <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-12 text-center text-xs text-[#8E9490]">
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-xs text-slate-400 shadow-sm">
           No trained models found. Run `python -m app.ml.train_ranker --model all` to train.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Active Model Summary Card */}
           <div className="space-y-6">
-            <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-6">
-              <div className="border-b border-[#EEE7DA] pb-4 flex items-center gap-3">
-                <Brain className="w-5 h-5 text-[#5A738E]" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490]">Active Model Details</h3>
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex items-center gap-3">
+                <Brain className="w-5 h-5 text-blue-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Model Details</h3>
               </div>
 
               <div className="space-y-4 text-xs">
-                <div className="flex items-center justify-between border-b border-[#EEE7DA] pb-2">
-                  <span className="text-[#8E9490]">Model Type</span>
-                  <span className="font-mono text-[#1F2421] font-semibold capitalize">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-400">Model Type</span>
+                  <span className="font-mono text-slate-900 font-semibold capitalize">
                     {activeRun.model_type.replace('_', ' ')}
                   </span>
                 </div>
-                <div className="flex items-center justify-between border-b border-[#EEE7DA] pb-2">
-                  <span className="text-[#8E9490]">Training Samples</span>
-                  <span className="font-mono text-[#1F2421] font-semibold">{activeRun.num_samples}</span>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-400">Training Samples</span>
+                  <span className="font-mono text-slate-900 font-semibold">{activeRun.num_samples}</span>
                 </div>
-                <div className="flex items-center justify-between border-b border-[#EEE7DA] pb-2">
-                  <span className="text-[#8E9490]">Training Duration</span>
-                  <span className="font-mono text-[#1F2421] font-semibold">{activeRun.training_duration_s.toFixed(2)}s</span>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-400">Training Duration</span>
+                  <span className="font-mono text-slate-900 font-semibold">{activeRun.training_duration_s.toFixed(2)}s</span>
                 </div>
                 <div className="flex items-center justify-between pb-2">
-                  <span className="text-[#8E9490]">Status</span>
-                  <span className="text-[#6E8B7E] font-semibold flex items-center gap-1">
+                  <span className="text-slate-400">Status</span>
+                  <span className="text-emerald-600 font-semibold flex items-center gap-1">
                     <CheckCircle className="w-3.5 h-3.5" />
                     In Production
                   </span>
@@ -105,10 +105,10 @@ const MLDashboard: React.FC = () => {
 
           {/* Feature Importance Column */}
           <div className="lg:col-span-2">
-            <div className="bg-[#F5F1E8]/40 border border-[#EEE7DA] rounded-lg p-6 space-y-6">
-              <div className="border-b border-[#EEE7DA] pb-4 flex items-center gap-3">
-                <BarChart2 className="w-5 h-5 text-[#5A738E]" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8E9490]">Feature Importance Rankings</h3>
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex items-center gap-3">
+                <BarChart2 className="w-5 h-5 text-blue-500" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Feature Importance Rankings</h3>
               </div>
 
               <div className="space-y-4">
