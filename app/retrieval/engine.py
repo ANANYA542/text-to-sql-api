@@ -626,58 +626,161 @@ class RetrievalEngine:
 
         return candidates
 
-    def retrieve(self, question: str, top_k: int = 5) -> dict:
-        # Compute category boosts first so we can force-include high-priority tables
-        cat_boosts = self.get_category_boosts(question)
+    def retrieve(self, question: str, top_k: int = 5, use_learned_ranker: bool = True) -> dict:
+        """
+        Runs the complete retrieval pipeline with optional learned reranking.
 
-        # Tables with individual boost > 0.8 are force-injected into candidate pool
+        Pipeline stages:
+            1. Query expansion (rule-based + LLM)
+            2. Hybrid candidate retrieval (BM25 + cosine + name/category boosts)
+            3. Cross-encoder reranking
+            4. [Optional] Learned ML ranker (LightGBM/XGBoost)
+            5. Score calibration and response construction
+
+        Args:
+            question: Natural language question.
+            top_k: Number of tables to return.
+            use_learned_ranker: If True, attempts to use the trained ML model.
+                Falls back to heuristic fusion if the model is not available.
+
+        Returns:
+            Dict with retrieved_tables, scores, confidence, details, and latency_breakdown.
+        """
+        import time as _time
+        latency_breakdown = {}
+
+        # ── Stage 1: Category boosts and candidate retrieval ──────────
+        t0 = _time.perf_counter()
+
+        cat_boosts = self.get_category_boosts(question)
         forced_tables = [t for t, b in cat_boosts.items() if b >= 0.8]
 
-        # 1. Get 25 hybrid candidates — enough to let cross-encoder surface niche-but-correct tables
         candidates = self.get_hybrid_candidates(question, top_k=25, forced_tables=forced_tables)
-        
+        latency_breakdown["retrieval_ms"] = round((_time.perf_counter() - t0) * 1000, 2)
+
         if not candidates:
-            return {"retrieved_tables": [], "scores": [], "confidence": 0.0, "details": {}}
-            
-        # 2. Prepare Cross-Encoder pairs
+            return {
+                "retrieved_tables": [], "scores": [], "confidence": 0.0,
+                "details": {}, "latency_breakdown": latency_breakdown,
+                "model_used": "none",
+            }
+
+        candidate_names = [name for name, _ in candidates]
+
+        # ── Stage 2: Cross-Encoder reranking ──────────────────────────
+        t1 = _time.perf_counter()
+
         pairs = []
         for name, _ in candidates:
             desc = self.schema.get(name, name)
             clean_desc = self.clean_descriptions.get(name, desc)
             pairs.append([question, clean_desc])
-            
+
         raw_logits = np.asarray(self.cross_encoder.predict(pairs), dtype=float)
         raw_logits = np.nan_to_num(raw_logits, nan=0.0, posinf=0.0, neginf=0.0)
-        
-        # 3. Fusion scoring
-        fusion_results = []
-        prob_dict = {}
-        for i, (name, cand_score) in enumerate(candidates):
-            logit = float(raw_logits[i])
-            prob = 1.0 / (1.0 + math.exp(-logit))
-            prob_dict[name] = prob
-            
-            # Fuse candidate score (keyword/bi-encoder/graph) with CE probability
-            fusion_score = cand_score + prob * 1.5
-            fusion_results.append((name, fusion_score))
-            
-        # Sort by fusion score
-        ranked = sorted(fusion_results, key=lambda x: x[1], reverse=True)
-        final_candidates = ranked[:top_k]
-        
+
+        ce_logits_dict = {}
+        for i, name in enumerate(candidate_names):
+            ce_logits_dict[name] = float(raw_logits[i])
+
+        latency_breakdown["reranking_ms"] = round((_time.perf_counter() - t1) * 1000, 2)
+
+        # ── Stage 3: Learned ranker (optional) or heuristic fusion ────
+        t2 = _time.perf_counter()
+        model_used = "heuristic"
+        final_candidates = []
+
+        if use_learned_ranker:
+            try:
+                from app.ml.learned_ranker import LearnedRanker, DEFAULT_MODEL_PATH
+                from app.ml.feature_engineering import FeatureExtractor, PipelineScores
+
+                if DEFAULT_MODEL_PATH.exists():
+                    # Build PipelineScores from intermediate results
+                    # Capture BM25 and cosine scores/ranks
+                    expanded_query = self.expand_query(question, use_llm=False)
+                    bm25_raw = self.bm25.get_scores(expanded_query.lower().split())
+                    bm25_max = max(bm25_raw) if len(bm25_raw) > 0 and max(bm25_raw) > 0 else 1.0
+                    bm25_min = min(bm25_raw) if len(bm25_raw) > 0 else 0.0
+                    bm25_range = bm25_max - bm25_min if bm25_max != bm25_min else 1.0
+
+                    bm25_scores_dict = {}
+                    bm25_ranks_dict = {}
+                    bm25_pairs = sorted(
+                        zip(self.table_names, bm25_raw),
+                        key=lambda x: x[1], reverse=True,
+                    )
+                    for rank, (tname, score) in enumerate(bm25_pairs):
+                        bm25_scores_dict[tname] = (float(score) - bm25_min) / bm25_range
+                        bm25_ranks_dict[tname] = rank + 1
+
+                    from sentence_transformers import util as st_util
+                    q_emb = self.bi_encoder.encode(question, convert_to_tensor=True)
+                    cos_raw = st_util.cos_sim(q_emb, self.table_embeddings)[0].tolist()
+                    cosine_scores_dict = {}
+                    cosine_ranks_dict = {}
+                    cos_pairs = sorted(
+                        zip(self.table_names, cos_raw),
+                        key=lambda x: x[1], reverse=True,
+                    )
+                    for rank, (tname, score) in enumerate(cos_pairs):
+                        cosine_scores_dict[tname] = float(score)
+                        cosine_ranks_dict[tname] = rank + 1
+
+                    pipeline_scores = PipelineScores(
+                        bm25_scores=bm25_scores_dict,
+                        cosine_scores=cosine_scores_dict,
+                        cross_encoder_logits=ce_logits_dict,
+                        bm25_ranks=bm25_ranks_dict,
+                        cosine_ranks=cosine_ranks_dict,
+                        llm_expansion_text=expanded_query,
+                    )
+
+                    # Extract features and predict
+                    fe = FeatureExtractor(self.schema, self.relations, self.table_names)
+                    X = fe.extract_batch(question, candidate_names, pipeline_scores)
+
+                    ranker = LearnedRanker.load(DEFAULT_MODEL_PATH)
+                    final_candidates = ranker.predict_top_k(X, candidate_names, k=top_k)
+                    model_used = f"learned_{ranker.model_type}"
+                    logger.info(f"Learned ranker ({ranker.model_type}) produced top-{top_k} results.")
+                else:
+                    logger.debug("No trained model found. Falling back to heuristic fusion.")
+                    use_learned_ranker = False  # Fall through to heuristic path
+            except Exception as e:
+                logger.warning(f"Learned ranker failed: {e}. Falling back to heuristic.")
+                use_learned_ranker = False  # Fall through to heuristic path
+
+        # Heuristic fusion fallback
+        if not final_candidates:
+            fusion_results = []
+            for i, (name, cand_score) in enumerate(candidates):
+                logit = float(raw_logits[i])
+                prob = 1.0 / (1.0 + math.exp(-logit))
+                fusion_score = cand_score + prob * 1.5
+                fusion_results.append((name, fusion_score))
+
+            ranked = sorted(fusion_results, key=lambda x: x[1], reverse=True)
+            final_candidates = ranked[:top_k]
+
+        latency_breakdown["ml_reranking_ms"] = round((_time.perf_counter() - t2) * 1000, 2)
+
+        # ── Stage 4: Score calibration and response construction ──────
         table_names = [name for name, _ in final_candidates]
-        
-        # Calibrate raw cross-encoder logits for display/relevance output (sigmoidal temperature calibration)
+
         calibrated_probs = {}
         for name in table_names:
-            idx = [c[0] for c in candidates].index(name)
-            logit = float(raw_logits[idx])
-            calibrated_prob = 1.0 / (1.0 + math.exp(- (logit + 2.5) / 1.2 ))
+            if name in ce_logits_dict:
+                logit = ce_logits_dict[name]
+                calibrated_prob = 1.0 / (1.0 + math.exp(-(logit + 2.5) / 1.2))
+            else:
+                # For tables added by the learned ranker that weren't in the CE batch
+                calibrated_prob = 0.5
             calibrated_probs[name] = calibrated_prob
 
         scores = [round(calibrated_probs[name], 4) for name in table_names]
         confidence = scores[0] if scores else 0.0
-        
+
         details = {}
         question_lower = question.lower()
         for name in table_names:
@@ -687,16 +790,22 @@ class RetrievalEngine:
                 reason = f"Question directly mentions table '{name}'"
             else:
                 reason = f"Semantically mapped table based on query intent (score={prob})"
-                
+
             details[name] = {
                 "relevance_score": prob,
                 "reason": reason,
                 "raw_relevance": prob,
             }
-            
+
+        latency_breakdown["total_ms"] = round(
+            sum(v for v in latency_breakdown.values()), 2
+        )
+
         return {
             "retrieved_tables": table_names,
             "scores": scores,
             "confidence": confidence,
             "details": details,
+            "latency_breakdown": latency_breakdown,
+            "model_used": model_used,
         }

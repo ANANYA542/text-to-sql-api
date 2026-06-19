@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import os
 import time
+import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.core import config
 from app.models.requests import RetrieveRequest, GenerateSQLRequest
@@ -18,6 +22,8 @@ from app.retrieval.engine import RetrievalEngine
 from app.generation.generator import generate_sql_query
 from app.database.validator import validate_sql
 from app.database.connection import get_db_connection, create_and_seed_db
+from app.core.metrics_collector import MetricsCollector, RequestRecord
+from app.core.pipeline_logger import PipelineLogger
 from scripts.test_retrieval_accuracy import extract_tables_and_ctes
 
 logger = logging.getLogger(__name__)
@@ -25,21 +31,24 @@ logger = logging.getLogger(__name__)
 # Global state
 engine: RetrievalEngine | None = None
 valid_schema_tables: set[str] = set()
+schema_data: dict[str, str] = {}
+metrics_collector = MetricsCollector()
+pipeline_logger = PipelineLogger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global engine, valid_schema_tables
+    global engine, valid_schema_tables, schema_data
     logger.info("=== Starting up: initializing database and models ===")
     try:
         # Create and seed SQLite database
         create_and_seed_db()
         
         # Load schema
-        schema = load_beaver_schema(split="dw")
-        valid_schema_tables = {name.upper() for name in schema.keys()}
+        schema_data = load_beaver_schema(split="dw")
+        valid_schema_tables = {name.upper() for name in schema_data.keys()}
         
         # Initialize retrieval engine
-        engine = RetrievalEngine(schema)
+        engine = RetrievalEngine(schema_data)
         logger.info("=== Startup complete ===")
     except Exception as e:
         logger.error(f"Startup failed: {e}", exc_info=True)
@@ -50,9 +59,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Enterprise Text-to-SQL API",
     description="Full-featured enterprise Text-to-SQL system using Beaver benchmark.",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
+
+# Mount static files for the dashboard
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# ═══════════════════════════════════════════════════════════════
+# Dashboard Route
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/", include_in_schema=False)
+async def serve_dashboard():
+    """Serves the interactive web dashboard."""
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"message": "Dashboard not found. Visit /docs for API documentation."}
+
+# ═══════════════════════════════════════════════════════════════
+# Core API Endpoints
+# ═══════════════════════════════════════════════════════════════
 
 @app.post(
     "/retrieve",
@@ -62,10 +92,46 @@ app = FastAPI(
 async def retrieve_tables(request: RetrieveRequest):
     if engine is None:
         raise HTTPException(status_code=500, detail="Retrieval engine not initialized")
+    
+    start_time = time.perf_counter()
     try:
         result = engine.retrieve(request.question, top_k=request.top_k)
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        
+        # Record metrics
+        metrics_collector.record(RequestRecord(
+            endpoint="/retrieve",
+            timestamp=time.time(),
+            latency_ms=latency_ms,
+            success=True,
+            num_tables_retrieved=len(result.get("retrieved_tables", [])),
+            top_confidence=result.get("confidence", 0.0),
+            used_learned_ranker="learned" in result.get("model_used", ""),
+            retrieval_ms=result.get("latency_breakdown", {}).get("retrieval_ms", 0),
+            reranking_ms=result.get("latency_breakdown", {}).get("reranking_ms", 0),
+        ))
+        
+        # Log pipeline execution
+        pipeline_logger.log(
+            question=request.question,
+            retrieved_tables=result.get("retrieved_tables", []),
+            scores=result.get("scores", []),
+            confidence=result.get("confidence", 0.0),
+            model_used=result.get("model_used", "heuristic"),
+            latency_ms=latency_ms,
+            latency_breakdown=result.get("latency_breakdown", {}),
+        )
+        
         return RetrieveResponse(**result)
     except Exception as e:
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        metrics_collector.record(RequestRecord(
+            endpoint="/retrieve",
+            timestamp=time.time(),
+            latency_ms=latency_ms,
+            success=False,
+            error_type=type(e).__name__,
+        ))
         logger.error(f"Retrieval failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -78,21 +144,61 @@ async def generate_sql(request: GenerateSQLRequest):
     if engine is None:
         raise HTTPException(status_code=500, detail="Retrieval engine not initialized")
     
-    start_time = time.time()
+    start_time = time.perf_counter()
     try:
         # 1. Retrieve tables
+        t_retrieve = time.perf_counter()
         ret_val = engine.retrieve(request.question, top_k=5)
         retrieved_tables = ret_val.get("retrieved_tables", [])
         confidence = ret_val.get("confidence", 0.5)
+        retrieval_ms = (time.perf_counter() - t_retrieve) * 1000
 
         # 2. Generate SQL query
+        t_gen = time.perf_counter()
         sql_query = generate_sql_query(request.question, retrieved_tables)
+        generation_ms = (time.perf_counter() - t_gen) * 1000
 
         # 3. Validate generated SQL
+        t_val = time.perf_counter()
         is_valid_syntax, parsing_errors = validate_sql(sql_query)
+        validation_ms = (time.perf_counter() - t_val) * 1000
 
         # Build prompt used for debugging/audit
         prompt_used = f"Question: {request.question} | Context tables: {', '.join(retrieved_tables)}"
+
+        total_latency_ms = (time.perf_counter() - start_time) * 1000
+
+        # Record metrics
+        metrics_collector.record(RequestRecord(
+            endpoint="/generate-sql",
+            timestamp=time.time(),
+            latency_ms=total_latency_ms,
+            success=True,
+            num_tables_retrieved=len(retrieved_tables),
+            top_confidence=confidence,
+            used_learned_ranker="learned" in ret_val.get("model_used", ""),
+            retrieval_ms=retrieval_ms,
+            generation_ms=generation_ms,
+            validation_ms=validation_ms,
+        ))
+
+        # Log pipeline execution
+        pipeline_logger.log(
+            question=request.question,
+            retrieved_tables=retrieved_tables,
+            scores=ret_val.get("scores", []),
+            confidence=confidence,
+            model_used=ret_val.get("model_used", "heuristic"),
+            sql_generated=sql_query,
+            is_valid=is_valid_syntax,
+            parsing_errors=parsing_errors,
+            latency_ms=total_latency_ms,
+            latency_breakdown={
+                "retrieval_ms": round(retrieval_ms, 2),
+                "generation_ms": round(generation_ms, 2),
+                "validation_ms": round(validation_ms, 2),
+            },
+        )
 
         return GenerateSQLResponse(
             sql=sql_query,
@@ -103,6 +209,14 @@ async def generate_sql(request: GenerateSQLRequest):
             prompt_used=prompt_used
         )
     except Exception as e:
+        total_latency_ms = (time.perf_counter() - start_time) * 1000
+        metrics_collector.record(RequestRecord(
+            endpoint="/generate-sql",
+            timestamp=time.time(),
+            latency_ms=total_latency_ms,
+            success=False,
+            error_type=type(e).__name__,
+        ))
         logger.error(f"SQL generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -317,6 +431,78 @@ async def run_benchmark():
         subtask_breakdown=breakdown,
         error_analysis=errors
     )
+
+# ═══════════════════════════════════════════════════════════════
+# Dashboard API Endpoints
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/schema")
+async def get_schema():
+    """Returns all table schemas for the schema explorer."""
+    if not schema_data:
+        return []
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    tables = []
+    for table_name, desc in schema_data.items():
+        # Get column names from the database
+        columns = []
+        try:
+            cursor.execute(f'PRAGMA table_info("{table_name}")')
+            for col in cursor.fetchall():
+                col_name = col["name"]
+                # Skip audit columns
+                c = col_name.lower()
+                if any(x in c for x in ("warehouse_load_date", "last_activity_date", "load_date", "load_dt")):
+                    continue
+                columns.append(col_name)
+        except Exception:
+            pass
+
+        # Count relations
+        from app.retrieval.engine import RetrievalEngine
+        relations_count = 0
+        if engine:
+            neighbors = engine.relations.get(table_name.upper(), [])
+            relations_count = len(neighbors)
+
+        tables.append({
+            "table_name": table_name,
+            "columns": columns,
+            "relations": relations_count,
+            "description": desc[:200] if desc else "",
+        })
+
+    conn.close()
+    return tables
+
+@app.get("/api/experiments")
+async def get_experiments():
+    """Returns ML experiment history for the dashboard."""
+    from app.ml.experiment_tracker import ExperimentTracker
+    
+    tracker = ExperimentTracker()
+    runs = tracker.list_runs()
+    
+    return [
+        {
+            "run_id": run.run_id,
+            "model_type": run.model_type,
+            "timestamp": run.timestamp,
+            "num_samples": run.num_training_samples,
+            "training_duration_s": round(run.training_duration_seconds, 1),
+            "feature_importances": run.feature_importances,
+            **run.val_metrics,
+        }
+        for run in runs
+    ]
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Returns production metrics for the monitoring dashboard."""
+    return metrics_collector.get_metrics()
 
 @app.get("/health")
 async def health():

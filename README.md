@@ -1,58 +1,86 @@
 # Enterprise Text-to-SQL Engine
 
-A high-performance FastAPI microservice designed to translate natural language questions into valid, executable SQLite queries against the Beaver Database Benchmark (97 tables, 5,787 queries).
+A production-grade ML pipeline that translates natural language questions into executable SQL queries against large-scale enterprise databases. Built on the [Beaver Database Benchmark](https://huggingface.co/datasets/beaverbench) (97 tables, 5,787 queries) using a multi-stage retrieval-augmented generation (RAG) architecture with **classical ML reranking**.
 
-> **Key Milestone:** Achieved **86.00% Retrieval Recall@5** (target: >85%) and **96.67% Recall@10** with sub-700ms end-to-end latency.
+> **Key Results:** **86% Retrieval Recall@5** · **97% Recall@10** · **Sub-700ms latency** · **Learned LTR reranking with LightGBM/XGBoost**
+
+![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-f7931e?logo=scikit-learn)
+![LightGBM](https://img.shields.io/badge/LightGBM-4.0+-9cf)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)
 
 ---
 
-## Thought Process & Evolution
+## Table of Contents
 
-The primary challenge of the Beaver dataset is scale: **97 tables** with hundreds of columns cannot fit into a standard LLM context window without causing context inflation, extreme latency, and hallucinated joins. The solution required a multi-stage retrieval-augmented generation (RAG) pipeline to isolate the correct 3–5 tables.
+- [Problem Statement](#problem-statement)
+- [ML Methodology](#ml-methodology)
+- [System Architecture](#system-architecture)
+- [Feature Engineering](#feature-engineering)
+- [Model Training & Evaluation](#model-training--evaluation)
+- [Interactive Dashboard](#interactive-dashboard)
+- [Tech Stack](#tech-stack--performance)
+- [Repository Structure](#repository-structure)
+- [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+- [Production Deployment](#production-deployment)
+
+---
+
+## Problem Statement
+
+Enterprise databases like the Beaver benchmark contain **97 tables** with hundreds of columns. Translating natural language questions to SQL requires identifying the correct 3–5 tables from this massive schema space. Naive approaches (pasting all schemas into an LLM prompt) fail due to:
+
+| Failure Mode | Root Cause | Impact |
+|:---|:---|:---|
+| **Token overflow** | 97 tables × 20+ columns exceeds context limits | LLM cannot process the full schema |
+| **Hallucination** | Too many similar table names confuse the model | LLM invents non-existent columns and joins |
+| **Latency & cost** | Processing 50K+ tokens per query | 5-10x slower, 10x more expensive |
+
+**The core insight:** If we can identify the correct tables in the top-5, downstream SQL generation succeeds. If we can't, no LLM can recover — making this fundamentally a **schema retrieval and ranking problem**, not just an NLP problem.
+
+---
+
+## ML Methodology
 
 ### Iterative Optimization Journey
 
+We improved retrieval accuracy from **45% → 86%** through 6 iterations, each adding a distinct ML technique:
+
 ```mermaid
 graph LR
-    A[1. Base Semantic: 45%] --> B[2. CTE Bugfix: 66%]
-    B --> C[3. Hybrid Search: 70%]
-    C --> D[4. Cross-Encoder: 73%]
-    D --> E[5. Schema Graph: 78%]
-    E --> F[6. LLM Expansion: 86%]
+    A["1. Base Semantic<br/>45%"] --> B["2. CTE Bugfix<br/>66%"]
+    B --> C["3. Hybrid Search<br/>70%"]
+    C --> D["4. Cross-Encoder<br/>73%"]
+    D --> E["5. Schema Graph<br/>78%"]
+    E --> F["6. LLM Expansion<br/>86%"]
 ```
 
-| Iteration | Optimization Strategy | Recall@5 | Key Insight |
-| :--- | :--- | :--- | :--- |
-| **1** | **Base Semantic Search** | **45.0%** | Bi-encoders (`BGE`) struggle with exact schema keyword matches. |
-| **2** | **CTE Syntax Bugfix** | **66.0%** | SQL parser treated CTE aliases as physical tables. Fixing this removed massive noise. |
-| **3** | **Hybrid Retrieval** | **70.0%** | Fusing `BM25` (lexical) + `BGE` (semantic) resolved schema naming overlaps. |
-| **4** | **Cross-Encoder** | **73.0%** | Reranking top-25 candidates with `MiniLM` captured deep query-schema context. |
-| **5** | **Schema Enrichment** | **78.0%** | Augmenting tables with foreign keys/categories and propagating scores boosted related tables. |
-| **6** | **LLM Expansion & Boosts**| **86.0%** | Prompting `Llama-3.1-8B` for keyword expansion before retrieval bypassed vocabulary mismatch. |
+| Iteration | Strategy | Recall@5 | ML Technique | Key Insight |
+|:---:|:---|:---:|:---|:---|
+| 1 | Base Semantic Search | 45% | Bi-encoder cosine similarity (BGE) | Embeddings struggle with schema abbreviations |
+| 2 | CTE Syntax Bugfix | 66% | SQL AST parsing (sqlglot) | CTE aliases inflated metrics by 20+ points |
+| 3 | Hybrid Retrieval | 70% | BM25 + cosine fusion (α=0.5) | Lexical + semantic fusion covers both failure modes |
+| 4 | Cross-Encoder Reranking | 73% | MiniLM cross-encoder | Joint query-table encoding captures token-level interactions |
+| 5 | Schema Enrichment | 78% | FK graph score propagation | Boosting neighbor tables via relationship graph |
+| 6 | LLM Expansion + Boosts | 86% | Llama-3.1-8B keyword generation | Bridges vocabulary mismatch (user: "pupils" → schema: "students") |
 
----
+### Classical ML Reranking (The ML Upgrade)
 
-# Insights Learned from the BEAVER Paper
+The heuristic reranking rules (280+ lines of hand-coded `if` statements) were replaced with a **learned-to-rank (LTR) model** using gradient boosting:
 
-Translating natural language questions to SQL on large-scale databases is fundamentally a systems grounding problem, not just an LLM capability problem. Implementing this solution against the Beaver dataset highlighted several practical engineering constraints and design patterns:
+**Why gradient boosting over neural approaches?**
 
-### 1. The Grounding Bottleneck
-Enterprise schemas with dozens or hundreds of tables (like the 97 tables in Beaver) break naive zero-shot prompts. Injecting the entire database schema into the LLM context leads to token inflation, severe latency spikes, and severe join hallucinations. Therefore, the task is primarily a **schema retrieval and grounding** problem: if the correct tables are not identified in the top 5 candidates, the downstream generator has a 0% chance of producing a valid query.
+| Approach | Pros | Cons | Verdict |
+|:---|:---|:---|:---|
+| Logistic Regression | Simple, fast | Can't capture feature interactions | Too simple |
+| Random Forest | Handles interactions | No gradient optimization | Baseline |
+| **LightGBM** | **Fastest, best for small data** | **Slightly complex setup** | **Primary** |
+| XGBoost | Battle-tested regularization | Slower than LightGBM | Alternative |
+| Neural ranker | Complex patterns | Needs much more data, hard to interpret | Overkill |
 
-### 2. Limitations of Pure Semantic Search
-Vanilla vector embeddings (cosine similarity over bi-encoders) struggle with the sparse, heavily abbreviated naming structures typical of enterprise databases (e.g., `SIS_ADMIN_DEPARTMENT` vs. `STUDENT_DEPARTMENT`). While semantic models capture the broad intent, they fail on exact matches for acronyms, table IDs, and code abbreviations. This necessitated a **hybrid search** architecture that fuses BM25 lexical retrieval (for exact keywords/acronyms) with bi-encoder cosine similarity to bridge the semantic gap.
-
-### 3. Cross-Encoder Precision
-Bi-encoders represent queries and schemas as separate vectors, meaning they cannot model token-level interactions between the question and the schema columns. Adding a **cross-encoder reranker** allows joint query-schema encoding, significantly improving precision by filtering out false-positive semantic matches that survive first-stage retrieval.
-
-### 4. Schema Enrichment & Score Propagation
-Raw database schemas are semantically sparse. Manually enriching the schema with explicit table descriptions and relationship metadata (e.g., foreign key linkages and category designations) aligns natural language queries with relational structures. We propagate retrieval scores along these schema relationships so that if a primary table is matched, its key foreign-key neighbors receive a relative boost, ensuring complete query execution context.
-
-### 5. Metric Distortion from CTE Aliases
-A major observation during benchmarking was that naive SQL parsers count Common Table Expression (CTE) aliases (e.g., `inner_cte`) as physical schema tables. This inflates recall metrics falsely during evaluation. Discerning physical tables from CTE structures is crucial for establishing a correct, reliable evaluation baseline.
-
-### 6. Retrieval Calibration & Validation Loops
-To prevent downstream LLM confusion, retrieval scores must be calibrated. Applying sigmoidal temperature calibration on reranker logits transforms raw similarity values into realistic confidence scores (0.0 to 1.0). This feeds directly into a robust validation loop that tests query syntactical correctness and database execution feedback, allowing us to debug failures systematically.
+We train on **~1,250 samples** (50 queries × 25 candidates each) — perfectly adequate for gradient boosting but insufficient for deep learning.
 
 ---
 
@@ -62,12 +90,19 @@ To prevent downstream LLM confusion, retrieval scores must be calibrated. Applyi
 
 ```mermaid
 graph TD
-    Question[User Question] --> Exp[LLM Query Expansion]
-    Exp --> Retrieve[Hybrid Retrieval BM25 + Vector]
-    Retrieve --> Rerank[Cross-Encoder Reranking]
-    Rerank --> Gen[Llama-3.1 SQL Generation]
-    Gen --> Validate[SQL Validation & Execution]
-    Validate --> Response[JSON Response]
+    Q["User Question"] --> QE["Query Expansion<br/>Rule-based + LLM"]
+    QE --> BM25["BM25 Keyword Search"]
+    QE --> COS["Cosine Similarity<br/>BGE Bi-Encoder"]
+    BM25 --> HYB["Hybrid Merge<br/>α=0.5 fusion"]
+    COS --> HYB
+    HYB --> BOOST["Name/Category Boosts<br/>+ Schema Graph Propagation"]
+    BOOST --> CE["Cross-Encoder Reranking<br/>MiniLM-L-6-v2"]
+    CE --> FE["Feature Extraction<br/>28 features per table"]
+    FE --> LR["Learned Ranker<br/>LightGBM/XGBoost"]
+    LR --> TOP5["Top 5 Tables"]
+    TOP5 --> GEN["SQL Generation<br/>Llama-3.1-8B via Groq"]
+    GEN --> VAL["SQL Validation<br/>sqlglot AST + EXPLAIN"]
+    VAL --> RES["JSON Response"]
 ```
 
 ### Execution & Validation Flow
@@ -75,30 +110,137 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant Client
-    participant API
-    participant LLM
-    participant DB
+    participant API as FastAPI
+    participant Ret as RetrievalEngine
+    participant FE as FeatureExtractor
+    participant ML as LearnedRanker
+    participant LLM as Groq/Llama-3.1
+    participant DB as SQLite
 
     Client->>API: POST /generate-sql
-    API->>API: Hybrid Retrieval (Top 5 Tables)
-    API->>LLM: Generate SQL using Schema Context
-    LLM-->>API: SQL Query
-    API->>DB: Validate & Execute SQL
-    DB-->>API: Data Rows
-    API-->>Client: JSON Response
+    API->>Ret: retrieve(question, top_k=5)
+    Ret->>Ret: expand_query() → BM25 + Cosine
+    Ret->>Ret: Cross-Encoder rerank (25 candidates)
+    Ret->>FE: extract_features(question, 25 candidates)
+    FE-->>Ret: feature_matrix [25 × 28]
+    Ret->>ML: predict(feature_matrix)
+    ML-->>Ret: top 5 tables + scores
+    Ret-->>API: tables + confidence + latency
+    API->>LLM: generate_sql(question, schema_context)
+    LLM-->>API: SQL query
+    API->>DB: EXPLAIN QUERY PLAN (validation)
+    DB-->>API: validation result
+    API-->>Client: {sql, tables, confidence, metrics}
 ```
+
+---
+
+## Feature Engineering
+
+The learned ranker uses **28 handcrafted features** across 5 categories:
+
+### Feature Categories
+
+| Category | Count | Features | Signal |
+|:---|:---:|:---|:---|
+| **Lexical** | 7 | BM25 score, TF-IDF cosine, Jaccard (word + char 3-gram), exact/partial name match, token overlap | Exact text matching between question and table |
+| **Semantic** | 3 | Bi-encoder cosine, cross-encoder logit, calibrated CE probability | Meaning-level similarity |
+| **Structural** | 5 | Column count, FK relations, graph degree, join key overlap with candidates | Schema topology |
+| **Query** | 6 | Length (words/chars), aggregation/join/subquery keyword detection | Question characteristics |
+| **Interaction** | 7 | BM25×cosine product, rank positions, rank difference, score ratio, LLM expansion overlap, category prefix match | Cross-signal combinations |
+
+### Why These Features?
+
+Each feature replaces a specific heuristic rule with a learnable signal:
+
+- `exact_table_name_match` → replaces `get_table_name_boosts()` (100+ lines)
+- `category_prefix_match` → replaces `get_category_boosts()` (280+ lines)
+- `bm25_x_cosine` → captures agreement between lexical and semantic signals
+- `rank_difference` → detects ambiguous queries where BM25 and cosine disagree
+
+---
+
+## Model Training & Evaluation
+
+### Training Data Generation
+
+Training data is auto-generated from gold SQL annotations:
+
+```
+For each (question, gold_sql) pair in Beaver:
+    1. Parse gold_sql → extract gold_tables (correct answer)
+    2. Run retrieval pipeline → get 25 candidate_tables
+    3. For each candidate:
+       → Extract 28 features
+       → Label = 1 if in gold_tables, else 0
+    Result: ~1,250 training samples (50 queries × 25 candidates)
+```
+
+### Cross-Validation Strategy
+
+- **Grouped K-Fold (K=5)**: All candidates from the same question stay in the same fold to prevent information leakage.
+- **Stratified**: Ensures consistent positive/negative ratio (~20% positive) across folds.
+
+### Training Command
+
+```bash
+# Train a single model
+python -m app.ml.train_ranker --model lightgbm --cv-folds 5
+
+# Train and compare all model types
+python -m app.ml.train_ranker --model all
+
+# Custom configuration
+python -m app.ml.train_ranker --model xgboost --max-queries 50 --candidates 25
+```
+
+### Evaluation Metrics
+
+| Metric | What It Measures |
+|:---|:---|
+| **Recall@K** | Fraction of gold tables in top-K predictions (primary metric) |
+| **NDCG@K** | Whether relevant tables appear at higher positions |
+| **AUC-ROC** | Discrimination ability across thresholds |
+| **Precision/Recall/F1** | Per-sample classification quality |
+
+---
+
+## Interactive Dashboard
+
+The project includes a **premium web dashboard** served directly from FastAPI at `http://localhost:8000`:
+
+### Dashboard Features
+
+| Tab | Functionality |
+|:---|:---|
+| **🔍 Query** | Natural language input → SQL generation with animated pipeline visualization |
+| **📊 Benchmark** | Live evaluation metrics (Recall@5, Recall@10, execution accuracy, latency) |
+| **🗂️ Schema Explorer** | Searchable browser for all 97 tables with columns and relationship counts |
+| **🧪 Experiments** | ML training history with model comparison and feature importance charts |
+| **📈 Metrics** | Production monitoring: endpoint latency (P50/P95/P99), error rates, pipeline breakdown |
+
+### Design
+
+- Dark theme with glassmorphism panels and gradient accents
+- Animated pipeline step visualization during query execution
+- Confidence bars with color-coded relevance scores
+- Responsive layout for desktop and mobile
 
 ---
 
 ## Tech Stack & Performance
 
-| Layer | Component / Tool | Performance Metric | Score |
-| :--- | :--- | :--- | :--- |
-| **API** | FastAPI (Lifespan management) | **Retrieval Recall@5** | **86.00%** |
+| Layer | Component | Performance Metric | Score |
+|:---|:---|:---|:---|
+| **API** | FastAPI + Lifespan management | **Retrieval Recall@5** | **86.00%** |
 | **Vector Search** | `BAAI/bge-small-en-v1.5` | **Retrieval Recall@10** | **96.67%** |
 | **Reranking** | `cross-encoder/ms-marco-MiniLM-L-6-v2` | **Execution Accuracy** | **28.00%** |
-| **LLM** | Groq API `llama-3.1-8b-instant` | **SQL Parsing Success** | **32.00%** |
-| **Database** | SQLite + `beaverbench` (97 tables) | **Average Latency** | **~670ms** |
+| **Learned Ranking** | LightGBM / XGBoost / sklearn | **SQL Parsing Success** | **32.00%** |
+| **LLM** | Groq API `llama-3.1-8b-instant` | **Average Latency** | **~670ms** |
+| **Database** | SQLite + `beaverbench` (97 tables) | **Custom Functions** | VARIANCE, STDDEV, LOG |
+| **Monitoring** | In-memory MetricsCollector | **Latency Tracking** | P50/P95/P99 |
+| **ML Pipeline** | scikit-learn + LightGBM + XGBoost | **Feature Engineering** | 28 features |
+| **Experiment Tracking** | Local JSON-based tracker | **Model Comparison** | Multi-model |
 
 ---
 
@@ -107,50 +249,49 @@ sequenceDiagram
 ```text
 text-to-sql/
 ├── app/
-│   ├── main.py                     # API router, startup config
-│   ├── core/config.py              # Environment variables & directory setup
-│   ├── models/                     # Request and response models
+│   ├── main.py                          # FastAPI app, routes, dashboard serving
+│   ├── core/
+│   │   ├── config.py                    # Environment variables & directory setup
+│   │   ├── logging.py                   # Log configuration
+│   │   ├── metrics_collector.py         # Request latency & accuracy monitoring
+│   │   └── pipeline_logger.py           # Structured JSONL pipeline audit logs
+│   ├── models/
+│   │   ├── requests.py                  # Pydantic request schemas
+│   │   └── responses.py                 # Pydantic response schemas
 │   ├── retrieval/
-│   │   ├── engine.py               # 6-stage hybrid retrieval & reranking logic
-│   │   └── schema_loader.py        # Schema parser and relationship graph
-│   ├── generation/generator.py     # Prompt engineering & LLM connector
-│   └── database/
-│       ├── connection.py           # SQLite connection pools & custom SQL functions
-│       └── validator.py            # AST checking & query syntax validation
+│   │   ├── engine.py                    # Multi-stage retrieval + learned ranker
+│   │   └── schema_loader.py             # Schema enrichment & relationship graph
+│   ├── generation/
+│   │   └── generator.py                 # LLM prompt engineering & Groq API
+│   ├── database/
+│   │   ├── connection.py                # SQLite setup, custom aggregate functions
+│   │   └── validator.py                 # SQL syntax + execution validation
+│   ├── ml/                              # Machine Learning pipeline
+│   │   ├── feature_engineering.py       # 28-feature extraction for ranking
+│   │   ├── learned_ranker.py            # LightGBM/XGBoost training & inference
+│   │   ├── experiment_tracker.py        # Local experiment logging & comparison
+│   │   └── train_ranker.py              # Standalone training CLI script
+│   └── static/                          # Web UI dashboard
+│       ├── index.html                   # SPA with 5 interactive tabs
+│       └── index.css                    # Dark theme design system
+├── database/
+│   └── beaver_dw.db                     # SQLite database (97 tables)
+├── models/                              # Trained model artifacts
+│   └── ranker_v1.joblib                 # Serialized learned ranker
 ├── scripts/
-│   └── test_retrieval_accuracy.py  # Standalone evaluation script
-├── screenshots/                    # UI / API Execution screenshots
-├── requirements.txt                # Project dependencies
-└── README.md                       # Documentation
+│   └── test_retrieval_accuracy.py       # Recall@5 evaluation script
+├── Dockerfile                           # Multi-stage production container
+├── docker-compose.yml                   # Container orchestration
+├── requirements.txt                     # Python dependencies
+├── explanation.md                       # Deep engineering explanation
+└── README.md                            # This file
 ```
 
 ---
 
-## API Reference & Verification
-
-### 1. System Health Check
-`GET /health` verifies DB connections, model weights, and device allocation (CPU/MPS).
-![Health Check](screenshots/health.png)
-
-### 2. Table Retrieval
-`POST /retrieve` extracts relevant schema tables using hybrid search and cross-encoder reranking.
-![Table Retrieval](screenshots/retrieve.png)
-
-### 3. SQL Generation
-`POST /generate-sql` retrieves schemas, builds context, generates queries, and validates syntax.
-![SQL Generation](screenshots/generate.png)
-
-### 4. Interactive Benchmark
-`POST /benchmark` runs a real-time evaluation over 25 samples from the Beaver benchmark.
-![Benchmark Results](screenshots/benchmark.png)
-
-### 5. API Documentation
-Swagger interface available at `/docs`.
-![Swagger Docs](screenshots/docs.png)
-
----
-
 ## Quick Start
+
+### Local Development
 
 ```bash
 # Clone the repository
@@ -163,6 +304,117 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and supply your HF_TOKEN and GROQ_API_KEY
 
-# Start production-ready development server
+# Start the development server
 uvicorn app.main:app --reload --port 8000
+
+# Open the dashboard
+open http://localhost:8000
 ```
+
+### Train the ML Ranker
+
+```bash
+# Train and compare all model types
+python -m app.ml.train_ranker --model all
+
+# Train a specific model
+python -m app.ml.train_ranker --model lightgbm --cv-folds 5
+
+# Run retrieval accuracy evaluation
+python -m scripts.test_retrieval_accuracy
+```
+
+### Docker Deployment
+
+```bash
+# Build and run
+docker-compose up --build
+
+# Or manually
+docker build -t text-to-sql .
+docker run -p 8000:8000 --env-file .env text-to-sql
+```
+
+---
+
+## API Reference
+
+### 1. Dashboard
+`GET /` — Serves the interactive web dashboard.
+
+### 2. Table Retrieval
+`POST /retrieve` — Extracts relevant schema tables using hybrid search + learned reranking.
+```json
+{"question": "Which departments have more than 100 students?", "top_k": 5}
+```
+
+### 3. SQL Generation
+`POST /generate-sql` — Full pipeline: retrieval → SQL generation → validation.
+```json
+{"question": "Which departments have more than 100 students?"}
+```
+
+### 4. Benchmark
+`POST /benchmark` — Runs real-time evaluation over 25 Beaver benchmark queries.
+
+### 5. Health Check
+`GET /health` — Verifies DB connections, model weights, and device allocation.
+
+### 6. Schema Explorer API
+`GET /api/schema` — Returns all table schemas with columns and relationship counts.
+
+### 7. Experiment History
+`GET /api/experiments` — Returns ML training run history with metrics.
+
+### 8. Production Metrics
+`GET /api/metrics` — Returns latency percentiles, error rates, and pipeline breakdown.
+
+### 9. Swagger Documentation
+Available at `/docs` (auto-generated by FastAPI).
+
+---
+
+## Production Deployment
+
+### Monitoring
+
+The system includes built-in production monitoring:
+
+- **Request latency**: P50, P95, P99 percentiles per endpoint
+- **Error tracking**: Per-error-type counters and rates
+- **Pipeline breakdown**: Per-stage timing (expansion, retrieval, reranking, generation, validation)
+- **Model usage**: Tracks heuristic vs. learned ranker usage percentage
+- **Structured logging**: JSONL pipeline audit logs for offline analysis
+
+### Model Lifecycle
+
+```
+1. Generate training data from Beaver gold SQL
+2. Train + cross-validate (grouped K-fold)
+3. Compare models (LightGBM vs XGBoost vs RF vs GBM)
+4. Save best model to models/ranker_v1.joblib
+5. Engine auto-loads model at startup
+6. Graceful fallback to heuristic if model unavailable
+```
+
+---
+
+## Insights & Key Learnings
+
+1. **Schema retrieval is the bottleneck, not SQL generation.** Correct table identification determines 100% of downstream success.
+
+2. **Hybrid search (BM25 + semantic) is strictly superior to either alone.** BM25 catches exact keyword matches; embeddings catch conceptual similarity. The fusion covers both failure modes.
+
+3. **Cross-encoders are transformative for reranking.** Joint query-table encoding captures interactions that separate bi-encoder embeddings miss.
+
+4. **Heuristic rules don't generalize.** 280+ lines of hand-coded boosts work on benchmarks but fail on new queries. A learned model optimizes over the full distribution.
+
+5. **Feature engineering is where ML engineers create value.** Raw scores are available to anyone. The art is in designing interaction features (BM25 × cosine, rank disagreement) that capture non-obvious patterns.
+
+6. **CTE alias filtering is a subtle but critical correctness issue.** Without it, evaluation metrics are inflated by 20+ percentage points.
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.

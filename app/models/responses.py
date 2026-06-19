@@ -13,6 +13,8 @@ class RetrieveResponse(BaseModel):
     scores: list[float]
     confidence: float
     details: dict[str, TableDetail]
+    latency_breakdown: Optional[dict[str, float]] = None
+    model_used: Optional[str] = None
 
 class GenerateSQLResponse(BaseModel):
     sql: str
