@@ -49,11 +49,11 @@ USER appuser
 RUN mkdir -p /app/database /app/models /app/.cache
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; r=requests.get('http://localhost:8000/health'); exit(0 if r.status_code == 200 else 1)"
+    CMD python -c "import requests; r=requests.get('http://localhost:8001/health'); exit(0 if r.status_code == 200 else 1)"
 
 # Start the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
