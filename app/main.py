@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.core import config
-from app.models.requests import RetrieveRequest, GenerateSQLRequest
+from app.models.requests import RetrieveRequest, GenerateSQLRequest, ExecuteSQLRequest, ExplainSQLRequest
 from app.models.responses import (
     RetrieveResponse, TableDetail, GenerateSQLResponse,
     BenchmarkResponse, BenchmarkMetrics, BenchmarkSubtaskBreakdown, BenchmarkErrorAnalysis,
@@ -512,3 +512,47 @@ async def health():
         "num_tables": len(engine.table_names) if engine else 0,
         "database_exists": os.path.exists(config.DB_PATH)
     }
+
+@app.post("/api/execute-sql")
+async def execute_sql(request: ExecuteSQLRequest):
+    """Executes a SELECT query against the database and returns columns and rows."""
+    sql = request.sql.strip()
+    if not sql.upper().startswith("SELECT") and not sql.upper().startswith("WITH"):
+        raise HTTPException(status_code=400, detail="Only SELECT and WITH statements are allowed.")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql)
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = [list(row) for row in cursor.fetchmany(100)] # Limit to 100 rows
+        conn.close()
+        return {"columns": columns, "rows": rows}
+    except Exception as e:
+        logger.error(f"SQL execution error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/explain-sql")
+async def explain_sql(request: ExplainSQLRequest):
+    """Explains a SQL query execution plan."""
+    sql = request.sql.strip()
+    if sql.endswith(";"):
+        sql = sql[:-1]
+    explain_sql_query = f"EXPLAIN QUERY PLAN {sql}"
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(explain_sql_query)
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = [list(row) for row in cursor.fetchall()]
+        conn.close()
+        return {"columns": columns, "rows": rows}
+    except Exception as e:
+        logger.error(f"SQL explain error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 50):
+    """Returns recent structured audit logs from the pipeline logger."""
+    return pipeline_logger.get_recent_logs(limit=limit)
+

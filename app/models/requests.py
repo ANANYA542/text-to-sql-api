@@ -25,3 +25,10 @@ class GenerateSQLRequest(BaseModel):
         True,
         description="Whether to use retrieval engine context"
     )
+
+class ExecuteSQLRequest(BaseModel):
+    sql: str = Field(..., description="The SQL query to execute")
+
+class ExplainSQLRequest(BaseModel):
+    sql: str = Field(..., description="The SQL query to explain")
+
