@@ -9,6 +9,9 @@ class TableDetail(BaseModel):
     reason: str
 
 class RetrieveResponse(BaseModel):
+    model_config = {
+        "protected_namespaces": (),
+    }
     retrieved_tables: list[str]
     scores: list[float]
     confidence: float

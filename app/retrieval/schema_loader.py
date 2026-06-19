@@ -121,12 +121,10 @@ TABLE_SPECIFIC_USECASES: dict[str, str] = {
         "or book-level details linked to courses."
     ),
 
-    # STUDENT_DEPARTMENT: maps students to their enrolled departments
+    # STUDENT_DEPARTMENT: maps student departments metadata
     "STUDENT_DEPARTMENT": (
-        "This table maps individual students to their enrolled departments. "
-        "Use for queries about: which department a student belongs to, "
-        "student counts per department in the School of Engineering or other schools, "
-        "or filtering students by department or school affiliation."
+        "This table stores academic department metadata (like school and department code). "
+        "It does NOT contain individual student records."
     ),
 
     # SIS_ADMIN_DEPARTMENT: administrative department info (school name, phone, degree-granting flag)
@@ -191,8 +189,9 @@ TABLE_SPECIFIC_USECASES: dict[str, str] = {
     # MIT_STUDENT_DIRECTORY: student records including student year, department, degree status
     "MIT_STUDENT_DIRECTORY": (
         "This table is the MIT student directory containing records of all students with fields like "
-        "student ID, department, student year (G=Graduate, U=Undergraduate), degree type, "
-        "and enrollment status. "
+        "full name, department, student year (G=Graduate, U=Undergraduate), degree type, "
+        "and enrollment status. Use COUNT(FULL_NAME) or COUNT(EMAIL_ADDRESS) to count students, as there is no STUDENT_ID column. "
+        "Join with SIS_DEPARTMENT on MIT_STUDENT_DIRECTORY.DEPARTMENT = SIS_DEPARTMENT.DEPARTMENT_CODE. "
         "Use for queries about: graduate students (student year = G), undergraduate students, "
         "students by department, student counts, or unique student counts."
     ),

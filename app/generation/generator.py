@@ -111,7 +111,7 @@ GROUP BY icte.SCHOOL_NAME, icte.dept_budget_code_stddev, icte.school_full_name;
 """
 
 def get_table_schema_ddl(table_name: str) -> str:
-    """Gets the column names for a table in a highly compact format."""
+    """Gets the column names for a table in a highly compact format with description."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -125,7 +125,16 @@ def get_table_schema_ddl(table_name: str) -> str:
             if any(x in c for x in ("warehouse_load_date", "last_activity_date", "load_date", "record_status", "load_dt", "update_date")):
                 continue
             col_parts.append(col_name)
-        return f"{table_name}({', '.join(col_parts)})"
+        
+        # Add table description as a SQL comment
+        try:
+            from app.retrieval.schema_loader import get_table_usecase
+            usecase = get_table_usecase(table_name)
+            desc_comment = f" -- {usecase}"
+        except Exception:
+            desc_comment = ""
+            
+        return f"{table_name}({', '.join(col_parts)}){desc_comment}"
     except Exception as e:
         logger.error(f"Error fetching schema info for table {table_name}: {e}")
         return f"{table_name}()"
@@ -156,6 +165,51 @@ def generate_sql_query(question: str, retrieved_tables: list[str]) -> str:
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY environment variable is not set. Please add it to your .env file.")
 
+    # Get table columns dynamically to find join paths
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    table_cols = {}
+    for table in retrieved_tables:
+        try:
+            cursor.execute(f"PRAGMA table_info(\"{table}\")")
+            table_cols[table] = [col["name"].upper() for col in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error fetching columns for relationship extraction for table {table}: {e}")
+            table_cols[table] = []
+    conn.close()
+
+    # Generate relationships context
+    from app.retrieval.schema_loader import is_join_key_column
+
+    KNOWN_MAPPINGS = [
+        (("MIT_STUDENT_DIRECTORY", "DEPARTMENT"), ("SIS_DEPARTMENT", "DEPARTMENT_CODE")),
+        (("MIT_STUDENT_DIRECTORY", "DEPARTMENT"), ("STUDENT_DEPARTMENT", "DEPARTMENT_CODE")),
+        (("SIS_COURSE_DESCRIPTION", "DEPARTMENT"), ("SIS_DEPARTMENT", "DEPARTMENT_CODE")),
+        (("SIS_COURSE_DESCRIPTION", "DEPARTMENT"), ("STUDENT_DEPARTMENT", "DEPARTMENT_CODE")),
+        (("FAC_FLOOR", "BUILDING_KEY"), ("FCLT_BUILDING", "FCLT_BUILDING_KEY")),
+        (("FAC_ROOMS", "BUILDING_KEY"), ("FCLT_BUILDING", "FCLT_BUILDING_KEY")),
+        (("FCLT_ROOMS", "BUILDING_KEY"), ("FCLT_BUILDING", "FCLT_BUILDING_KEY")),
+        (("FCLT_FLOOR", "BUILDING_KEY"), ("FCLT_BUILDING", "FCLT_BUILDING_KEY")),
+    ]
+
+    relationships = []
+    for (t1, c1), (t2, c2) in KNOWN_MAPPINGS:
+        if t1 in retrieved_tables and t2 in retrieved_tables:
+            relationships.append(f"- {t1}.{c1} joins with {t2}.{c2}")
+
+    for i in range(len(retrieved_tables)):
+        for j in range(i + 1, len(retrieved_tables)):
+            t1 = retrieved_tables[i]
+            t2 = retrieved_tables[j]
+            shared_cols = set(table_cols[t1]).intersection(set(table_cols[t2]))
+            for col in shared_cols:
+                if is_join_key_column(col.lower()):
+                    relationships.append(f"- {t1}.{col} joins with {t2}.{col}")
+
+    rel_context = ""
+    if relationships:
+        rel_context = "RELATIONSHIPS:\n" + "\n".join(relationships) + "\n\n"
+
     schema_lines = []
     for table in retrieved_tables:
         schema_lines.append(get_table_schema_ddl(table))
@@ -164,11 +218,16 @@ def generate_sql_query(question: str, retrieved_tables: list[str]) -> str:
     # Cleaned and optimized system instruction
     system_instruction = (
         "You are a SQLite expert. Return ONLY the raw SQL query.\n"
+        "Strictly adhere to the provided SCHEMA and RELATIONSHIPS.\n"
+        "You must NEVER reference any columns, tables, or relations that are not explicitly listed in the SCHEMA. If a column is not in the schema list, it does not exist and you must not use it.\n"
+        "You must ONLY join tables using the paths specified in the RELATIONSHIPS list. Do not invent other join conditions.\n"
+        "Pay attention to table comments explaining what they store and which column to count.\n"
         "No markdown. No explanation. No code blocks. Just SQL."
     )
 
     user_prompt = (
         f"SCHEMA:\n{schema_context}\n\n"
+        f"{rel_context}"
         f"EXAMPLES:\n{FEW_SHOT_EXAMPLES.strip()}\n\n"
         f"QUESTION: {question}\n"
         f"SQL:"
