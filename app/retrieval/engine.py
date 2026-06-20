@@ -61,25 +61,39 @@ class RetrievalEngine:
             self.bi_encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
 
         logger.info("Precomputing and caching table embeddings...")
-        self.table_embeddings = self.bi_encoder.encode(self.clean_desc_list, convert_to_tensor=True)
+        self.table_embeddings = self.bi_encoder.encode(
+            self.clean_desc_list, 
+            batch_size=8, 
+            show_progress_bar=False, 
+            convert_to_tensor=True
+        )
+
+        import gc
+        import torch
+        gc.collect()
+        torch.cuda.empty_cache()
 
         tokenized = [desc.lower().split() for desc in self.clean_desc_list]
         self.bm25 = BM25Okapi(tokenized)
 
-        logger.info("Loading Cross-Encoder model...")
-        try:
-            self.cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="mps")
-            logger.info("Loaded Cross-Encoder on MPS (Apple GPU)")
-        except Exception as e:
-            logger.warning(f"Could not load Cross-Encoder on MPS: {e}. Falling back to CPU.")
-            self.cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cpu")
-            self.expansion_cache = {}
+        self.cross_encoder = None  # Lazy-loaded on demand to stay under 512MB RAM
 
         self.expansion_cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cache", "query_expansion_cache.json")
         self.expansion_cache = {}
         self.load_expansion_cache()
         self.last_api_call_time = 0.0
         logger.info("RetrievalEngine loaded.")
+
+    def get_cross_encoder(self):
+        if not hasattr(self, 'cross_encoder') or self.cross_encoder is None:
+            logger.info("Lazy-loading Cross-Encoder model...")
+            try:
+                # Always use CPU on cloud environments like Render
+                self.cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cpu")
+            except Exception as e:
+                logger.error(f"Failed to load Cross-Encoder: {e}")
+                raise e
+        return self.cross_encoder
 
     def load_expansion_cache(self):
         if os.path.exists(self.expansion_cache_path):
@@ -676,7 +690,7 @@ class RetrievalEngine:
             clean_desc = self.clean_descriptions.get(name, desc)
             pairs.append([question, clean_desc])
 
-        raw_logits = np.asarray(self.cross_encoder.predict(pairs), dtype=float)
+        raw_logits = np.asarray(self.get_cross_encoder().predict(pairs), dtype=float)
         raw_logits = np.nan_to_num(raw_logits, nan=0.0, posinf=0.0, neginf=0.0)
 
         ce_logits_dict = {}
