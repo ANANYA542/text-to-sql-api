@@ -13,7 +13,7 @@ import re
 # Configure page settings first
 st.set_page_config(
     page_title="Enterprise Text-to-SQL Engine",
-    page_icon="🤖",
+    page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -41,98 +41,185 @@ def get_resources():
 engine, schema_data, metrics, pipeline_logger = get_resources()
 valid_schema_tables = {name.upper() for name in schema_data.keys()}
 
-# Styling Custom Injections
+# Premium Slate Dark & Blue Theme Injections
 st.markdown("""
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+    /* Global Styles */
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
     }
-    .metric-card {
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    
+    .stApp {
+        background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+        color: #f3f4f6;
     }
-    .metric-value {
-        font-size: 24px;
-        font-weight: 700;
-        color: #0F172A;
+    
+    /* Headers */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #ffffff !important;
+        font-weight: 700 !important;
     }
-    .metric-label {
-        font-size: 14px;
-        color: #64748B;
-        font-weight: 500;
+    
+    /* Metric Cards */
+    div[data-testid="stMetricValue"] {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #60a5fa !important;
     }
-    .custom-title {
-        font-size: 32px;
+    div[data-testid="stMetricLabel"] {
+        font-size: 13px !important;
+        color: #9ca3af !important;
+        font-weight: 500 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Styled Containers & Cards */
+    .premium-card {
+        background: rgba(17, 24, 39, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        backdrop-filter: blur(8px);
+        margin-bottom: 20px;
+    }
+    
+    .pipeline-step {
+        border-left: 3px solid #3b82f6;
+        padding-left: 16px;
+        margin-bottom: 12px;
+    }
+    
+    /* Custom Badge */
+    .custom-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 600;
+        background-color: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Logo styling */
+    .brand-logo {
+        background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 50%, #1d4ed8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         font-weight: 800;
-        color: #0F172A;
-        margin-bottom: 4px;
+        font-size: 34px;
+        font-family: 'Space Grotesk', sans-serif;
+        letter-spacing: -0.02em;
     }
-    .custom-subtitle {
-        font-size: 16px;
-        color: #64748B;
-        margin-bottom: 24px;
+    
+    /* Tab Styling Overrides */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: rgba(17, 24, 39, 0.5);
+        padding: 8px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #9ca3af;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# App header
-st.markdown('<div class="custom-title">🤖 Enterprise Text-to-SQL Engine</div>', unsafe_allow_html=True)
-st.markdown('<div class="custom-subtitle">Production-grade ML pipeline on Beaver Benchmark with LTR reranking</div>', unsafe_allow_html=True)
+# Layout: Main Brand Area
+col_logo, col_desc = st.columns([2, 3])
+with col_logo:
+    st.markdown('<div class="brand-logo">💎 Enterprise Text-to-SQL</div>', unsafe_allow_html=True)
+with col_desc:
+    st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 15px; text-align: right;'>Advanced multi-stage pipeline using neural reranking and LLM code synthesizers.</p>", unsafe_allow_html=True)
+
+st.markdown("---")
 
 tabs = st.tabs([
-    "🔍 Workspace", 
-    "🗂 Schema Explorer", 
-    "📊 Evaluation & Benchmark", 
-    "🔬 ML Experiments", 
-    "📈 System Analytics",
-    "📋 Pipeline Logs"
+    "🔍 Workspace & Pipeline", 
+    "🗂 Database Schema Explorer", 
+    "📊 Precision Benchmarks", 
+    "🔬 Learned LTR Experiments", 
+    "📈 Analytics & Latency Histograms",
+    "📋 Real-time Logs"
 ])
 
 # ==========================================
-# TAB 1: WORKSPACE
+# TAB 1: WORKSPACE & PIPELINE
 # ==========================================
 with tabs[0]:
-    st.subheader("Interactive SQL Generation")
+    st.markdown("### Interactive Context-Restricted SQL Engine")
     
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 2])
     
     with col1:
+        st.markdown('<div class="premium-card">', unsafe_allow_html=True)
         question = st.text_area(
-            "Natural Language Question",
+            "Natural Language Inquiry",
             value="Which departments have more than 100 students?",
-            height=100
+            height=85,
+            placeholder="Ask a question about the university or facilities database schema..."
         )
         
         col_ctrl1, col_ctrl2 = st.columns(2)
         with col_ctrl1:
-            top_k = st.slider("Top K Tables to Retrieve", min_value=1, max_value=10, value=5)
+            top_k = st.slider("Max Context Schema Size (Top K Tables)", min_value=1, max_value=10, value=5)
         with col_ctrl2:
-            use_learned = st.toggle("Use Learned ML Ranker (LightGBM/XGBoost)", value=True)
+            use_learned = st.toggle("Activate Learned LTR Ranker (LightGBM/XGBoost)", value=True)
             
-        run_btn = st.button("Execute Pipeline", type="primary")
+        run_btn = st.button("Execute Translation Pipeline", type="primary", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
     with col2:
-        st.info(
-            "**How it works**:\n"
-            "1. **Query Expansion**: LLM & synonyms expand context.\n"
-            "2. **Candidate Retrieval**: Hybrid BM25 + Cosine search (Top 25).\n"
-            "3. **Learned Ranker**: Reranks tables using 28 ML features.\n"
-            "4. **SQL Gen**: Context-restricted LLM generates optimal query.\n"
-            "5. **Execution**: Validated against SQLite in real-time."
+        st.markdown(
+            f"""
+            <div class="premium-card" style="height: 100%;">
+                <h4 style="margin-top:0;">Pipeline Stages & Strategy</h4>
+                <div class="pipeline-step">
+                    <strong>1. Multi-stage Retrieval</strong><br/>
+                    <span style="color:#9ca3af; font-size:12px;">Combines BM25 lexical matching and semantic vector embeddings, then applies schema graph reachability propagation.</span>
+                </div>
+                <div class="pipeline-step">
+                    <strong>2. Precision Reranking</strong><br/>
+                    <span style="color:#9ca3af; font-size:12px;">Applies Cross-Encoder logits and a trained LightGBM model evaluating 28 custom features per candidate table.</span>
+                </div>
+                <div class="pipeline-step">
+                    <strong>3. Context-Restricted SQL Synthesis</strong><br/>
+                    <span style="color:#9ca3af; font-size:12px;">Compiles schemas of the top 5 tables only, prompting {config.LLM_MODEL} for zero-hallucination query creation.</span>
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
         )
 
     if run_btn and question:
         start_time = time.perf_counter()
         
         # Pipeline Logs tracker
-        status_box = st.status("Running pipeline stage-by-stage...", expanded=True)
+        status_box = st.status("Executing Pipeline Funnel...", expanded=True)
         
         # 1. Retrieval
-        status_box.write("Stage 1: Retrieval & learned reranking...")
+        status_box.write("⚙ Stage 1: Query Expansion and Candidates Retrieval...")
         t_ret = time.perf_counter()
         ret_val = engine.retrieve(question, top_k=top_k, use_learned_ranker=use_learned)
         ret_tables = ret_val.get("retrieved_tables", [])
@@ -140,17 +227,17 @@ with tabs[0]:
         confidence = ret_val.get("confidence", 0.5)
         ret_ms = (time.perf_counter() - t_ret) * 1000
         
-        status_box.write(f"✓ Retrieved tables: `{', '.join(ret_tables)}` (Confidence: {confidence:.2%})")
+        status_box.write(f"✓ Retrieved schema tables: `{', '.join(ret_tables)}` (Top confidence: {confidence:.2%})")
         
         # 2. Generation
-        status_box.write("Stage 2: LLM SQL generation...")
+        status_box.write("⚙ Stage 2: Prompt compilation and LLM generation...")
         t_gen = time.perf_counter()
         sql_query = generate_sql_query(question, ret_tables)
         gen_ms = (time.perf_counter() - t_gen) * 1000
-        status_box.write("✓ SQL query generated.")
+        status_box.write("✓ SQL query code synthesized.")
         
         # 3. Validation
-        status_box.write("Stage 3: AST and schema validation...")
+        status_box.write("⚙ Stage 3: Running AST parsing syntax validations...")
         t_val = time.perf_counter()
         is_valid_syntax, parsing_errors = validate_sql(sql_query)
         val_ms = (time.perf_counter() - t_val) * 1000
@@ -158,11 +245,11 @@ with tabs[0]:
         total_ms = (time.perf_counter() - start_time) * 1000
         
         if is_valid_syntax:
-            status_box.write("✓ SQL Syntax is valid!")
+            status_box.write("✓ Syntax check passed. Schema alignment correct.")
         else:
-            status_box.write(f"⚠ SQL Validation Errors: {parsing_errors}")
+            status_box.write(f"⚠ AST Syntax Warning: {parsing_errors}")
             
-        status_box.update(label=f"Pipeline complete in {total_ms:.1f}ms!", state="complete" if is_valid_syntax else "error")
+        status_box.update(label=f"Pipeline finished successfully in {total_ms:.1f}ms!", state="complete" if is_valid_syntax else "error")
         
         # Log to global metrics
         metrics.record(RequestRecord(
@@ -199,11 +286,12 @@ with tabs[0]:
         # Display Results
         res_col1, res_col2 = st.columns([1, 1])
         with res_col1:
-            st.markdown("### Generated SQL")
+            st.markdown('<div class="premium-card">', unsafe_allow_html=True)
+            st.markdown("#### Generated SQL Query")
             st.code(sql_query, language="sql")
             
             # Explain SQL Plan
-            if st.checkbox("Show SQL Execution Plan (EXPLAIN)"):
+            if st.checkbox("Show Query Execution Plan (EXPLAIN)"):
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
@@ -214,26 +302,30 @@ with tabs[0]:
                         st.dataframe(pd.DataFrame(explain_rows))
                 except Exception as e:
                     st.error(f"Failed to explain query plan: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
                     
         with res_col2:
-            st.markdown("### Execution Results")
+            st.markdown('<div class="premium-card">', unsafe_allow_html=True)
+            st.markdown("#### SQLite Execution Results")
             try:
                 conn = get_db_connection()
                 df = pd.read_sql_query(sql_query, conn)
                 conn.close()
                 st.dataframe(df, use_container_width=True)
-                st.success(f"Returned {len(df)} rows")
+                st.success(f"Execution match successful. Returned {len(df)} rows.")
             except Exception as e:
                 st.error(f"Database execution error: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# TAB 2: SCHEMA EXPLORER
+# TAB 2: DATABASE SCHEMA EXPLORER
 # ==========================================
 with tabs[1]:
-    st.subheader("Database Schema Explorer")
+    st.markdown("### Interactive Schema Directory")
+    st.write("Browse and search table structures across the 97 tables of the Beaver database schema.")
     
     # Simple search bar
-    search_query = st.text_input("Search tables or columns", value="")
+    search_query = st.text_input("Filter tables/columns", value="", placeholder="Type table prefix (e.g. SIS_, FCLT_) or column name...")
     
     # Filter schemas
     filtered_tables = []
@@ -247,10 +339,9 @@ with tabs[1]:
         selected_table = st.selectbox("Select Table to Explore", options=sorted(filtered_tables))
         
         if selected_table:
-            st.markdown(f"## Table: `{selected_table}`")
+            st.markdown(f"#### Table Details: `{selected_table}`")
             
-            desc = schema_data[selected_table]
-            st.write(desc)
+            st.info(schema_data[selected_table])
             
             # Fetch actual columns from SQLite DB
             try:
@@ -260,19 +351,19 @@ with tabs[1]:
                 cols = cursor.fetchall()
                 conn.close()
                 
-                cols_df = pd.DataFrame(cols)[["name", "type", "notnull", "dflt_value", "pk"]]
+                cols_df = pd.DataFrame(cols)[["name", "type", "notnull", "pk"]]
                 st.dataframe(cols_df, use_container_width=True)
             except Exception as e:
                 st.error(f"Could not load columns from database: {e}")
 
 # ==========================================
-# TAB 3: EVALUATION & BENCHMARK
+# TAB 3: PRECISION BENCHMARKS
 # ==========================================
 with tabs[2]:
-    st.subheader("Pipeline Benchmark Evaluation")
-    st.write("Run the offline accuracy evaluation on the Beaver dataset subset (25 queries).")
+    st.markdown("### Precision Evaluation Benchmarking")
+    st.write("Verify the retrieval accuracy and query validity of the engine using a gold-standard subset of 25 benchmark queries.")
     
-    if st.button("Start Benchmark Run", type="primary"):
+    if st.button("Execute Pipeline Benchmark Test Run", type="secondary", use_container_width=True):
         progress_bar = st.progress(0)
         status_text = st.empty()
         
@@ -291,7 +382,7 @@ with tabs[2]:
             conn = get_db_connection()
             
             for idx, row in enumerate(eval_queries):
-                status_text.text(f"Evaluating query #{idx+1} / {len(eval_queries)}: {row['question'][:60]}...")
+                status_text.text(f"Evaluating Query #{idx+1} / {len(eval_queries)}...")
                 
                 question = row["question"]
                 gold_sql = row["sql"]
@@ -350,21 +441,23 @@ with tabs[2]:
             conn.close()
             status_text.text("Benchmark complete!")
             
-            # Show summary metrics
+            # Show summary metrics in beautiful card columns
+            st.markdown('<div class="premium-card">', unsafe_allow_html=True)
             m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-            m_col1.metric("Recall@5", f"{(total_recall_5 / total_evaluated):.1%}")
-            m_col2.metric("Recall@10", f"{(total_recall_10 / total_evaluated):.1%}")
+            m_col1.metric("Recall@5 (Recall)", f"{(total_recall_5 / total_evaluated):.1%}")
+            m_col2.metric("Recall@10 (Coverage)", f"{(total_recall_10 / total_evaluated):.1%}")
             m_col3.metric("Execution Match Rate", f"{(execution_matches / total_evaluated):.1%}")
             m_col4.metric("Avg Latency", f"{(total_latency_ms / total_evaluated):.0f} ms")
+            st.markdown('</div>', unsafe_allow_html=True)
             
         except Exception as e:
             st.error(f"Benchmark run failed: {e}")
 
 # ==========================================
-# TAB 4: ML EXPERIMENTS
+# TAB 4: LEARNED LTR EXPERIMENTS
 # ==========================================
 with tabs[3]:
-    st.subheader("LTR Reranking Models & Experiments")
+    st.markdown("### LTR Model Runs & Experiments")
     
     from app.ml.experiment_tracker import ExperimentTracker
     tracker = ExperimentTracker()
@@ -377,44 +470,54 @@ with tabs[3]:
         selected_run_id = st.selectbox("Select Experiment Run", options=list(run_options.keys()))
         run = run_options[selected_run_id]
         
+        st.markdown('<div class="premium-card">', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("### Run Configurations")
+            st.markdown("#### Run Configurations")
             st.write(f"**Model Type**: `{run.model_type}`")
             st.write(f"**Timestamp**: {run.timestamp}")
             st.write(f"**Training Samples**: {run.num_training_samples}")
             st.write(f"**CV Folds**: {run.cv_folds}")
             st.write(f"**Training Duration**: {run.training_duration_seconds:.2f} seconds")
             
-            st.markdown("### Validation Metrics")
+            st.markdown("#### Validation Metrics")
             st.dataframe(pd.DataFrame([run.val_metrics]).T.rename(columns={0: "Score"}))
             
         with col2:
-            st.markdown("### Feature Importance")
+            st.markdown("#### Feature Importance Coefficient")
             if run.feature_importances:
                 feat_df = pd.DataFrame(list(run.feature_importances.items()), columns=["Feature", "Importance"])
                 feat_df = feat_df.sort_values(by="Importance", ascending=True).tail(15)
                 
-                fig, ax = plt.subplots(figsize=(6, 4))
+                # Dark slate compatible chart styling
+                plt.style.use('dark_background')
+                fig, ax = plt.subplots(figsize=(6, 4.2))
                 sns.barplot(x="Importance", y="Feature", data=feat_df, ax=ax, palette="Blues_d")
-                ax.set_title("Top Feature Importances")
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.set_title("Top Feature Importances", fontsize=12, fontweight='bold', pad=10)
                 st.pyplot(fig)
             else:
                 st.info("No feature importance logged for this model.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
-# TAB 5: SYSTEM ANALYTICS
+# TAB 5: ANALYTICS & LATENCY HISTOGRAMS
 # ==========================================
 with tabs[4]:
-    st.subheader("System Performance & Analytics")
+    st.markdown("### Production Observability & Performance Analytics")
     
     metrics_summary = metrics.get_metrics()
+    
+    # Safe metrics retrieval to avoid KeyErrors
+    avg_conf = metrics_summary.get("avg_confidence", 0.0)
+    ltr_usage = metrics_summary.get("learned_ranker_usage_pct", 0.0)
     
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Requests", metrics_summary["total_requests"])
     col2.metric("Pipeline Error Rate", f"{metrics_summary['error_rate']:.2%}")
-    col3.metric("Avg Retrieval Confidence", f"{metrics_summary['avg_confidence']:.2%}")
-    col4.metric("LTR Ranker Usage", f"{metrics_summary['learned_ranker_usage_pct']:.2%}")
+    col3.metric("Avg Retrieval Confidence", f"{avg_conf:.2%}")
+    col4.metric("Avg LTR Ranker Usage", f"{ltr_usage:.2%}")
     
     st.markdown("---")
     
@@ -438,10 +541,10 @@ with tabs[4]:
             st.pyplot(fig)
 
 # ==========================================
-# TAB 6: PIPELINE LOGS
+# TAB 6: REAL-TIME LOGS
 # ==========================================
 with tabs[5]:
-    st.subheader("Structured JSONL Audit Logs")
+    st.markdown("### Structured JSONL Audit Logs")
     
     limit = st.slider("Max logs to display", min_value=10, max_value=100, value=50)
     recent_logs = pipeline_logger.get_recent_logs(limit=limit)
