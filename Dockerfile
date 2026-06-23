@@ -1,16 +1,4 @@
-# ═══════════════════════════════════════════════════════════════
-# Enterprise Text-to-SQL Engine — Production Dockerfile
-#
-# Multi-stage build:
-#   1. Builder: installs Python dependencies and downloads models
-#   2. Runtime: minimal image for running the API
-#
-# Usage:
-#   docker build -t text-to-sql .
-#   docker run -p 8000:8000 --env-file .env text-to-sql
-# ═══════════════════════════════════════════════════════════════
 
-# ── Stage 1: Builder ──────────────────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -53,7 +41,7 @@ EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; r=requests.get('http://localhost:8001/health'); exit(0 if r.status_code == 200 else 1)"
+    CMD python -c "import requests; r=requests.get('http://localhost:8001/'); exit(0 if r.status_code == 200 else 1)"
 
 # Start the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8001", "--server.address=0.0.0.0"]

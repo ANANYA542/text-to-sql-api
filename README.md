@@ -325,6 +325,15 @@ Follow these instructions to deploy the engine in a production-ready environment
 4. **Heuristic rules do not generalize**: Hundreds of lines of hand-coded boosts fail on new queries. Machine learning models train and optimize over the full data distribution.
 5. **CTE alias filtering is critical for accurate evaluation metrics**: Removing CTE aliases from correct labels prevents recall scores from being artificially inflated.
 
+## Future Improvements
+
+We plan to implement the following core updates to mature the Text-to-SQL architecture:
+
+1. **Multi-Turn Conversational SQL Generation**: Implement chat session memory and tracking so the retrieval funnel and SQL generator can interpret references to previous query results (e.g. "filter the last results to only active students").
+2. **Self-Correction Agent Loops**: Design an agentic feedback cycle that executes generated SQL inside a dry-run transaction. If SQLite raises syntax/execution exceptions or if the AST structure fails validations, the error stack trace is fed back to the LLM for automatic query correction (up to 3 retries).
+3. **Graph Neural Network (GNN) Schema Ranking**: Upgrade the LTR feature ranker with GNN architectures (e.g. GraphSAGE/GCN) to model tables as nodes and foreign key constraints as edges. This enables joint path retrieval rather than independent table ranking.
+4. **Active Schema Pruning & Context Pruning**: Implement graph path reachability filters during Stage 2 retrieval to prune tables that have no valid join paths to the existing candidate set, maximizing precision.
+
 ---
 
 ## License
