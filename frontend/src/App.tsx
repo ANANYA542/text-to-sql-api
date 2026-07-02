@@ -2,21 +2,23 @@ import React, { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import type { TabType } from './store/useStore'
 import Dashboard from './components/Dashboard'
+import GenerateSQL from './components/GenerateSQL'
 import PipelinePage from './components/PipelinePage'
-import SQLWorkspace from './components/SQLWorkspace'
 import MLDashboard from './components/MLDashboard'
 import ExperimentTracker from './components/ExperimentTracker'
 import LogsPage from './components/LogsPage'
 import MetricsPage from './components/MetricsPage'
+import SettingsPage from './components/SettingsPage'
 import { 
   LayoutDashboard, 
+  Sparkles, 
   Search, 
-  Code2, 
   Brain, 
+  TrendingUp, 
   FlaskConical, 
   FileText, 
-  TrendingUp,
-  AlertCircle
+  Sliders, 
+  AlertCircle 
 } from 'lucide-react'
 
 const App: React.FC = () => {
@@ -46,37 +48,40 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />
+      case 'generate':
+        return <GenerateSQL />
       case 'pipeline':
         return <PipelinePage />
-      case 'sql':
-        return <SQLWorkspace />
       case 'ml':
         return <MLDashboard />
+      case 'metrics':
+        return <MetricsPage />
       case 'experiments':
         return <ExperimentTracker />
       case 'logs':
         return <LogsPage />
-      case 'metrics':
-        return <MetricsPage />
+      case 'settings':
+        return <SettingsPage />
       default:
         return <Dashboard />
     }
   }
 
   const navItems = [
-    { id: 'dashboard' as TabType, label: 'Workspace', icon: LayoutDashboard },
-    { id: 'pipeline' as TabType, label: 'Retrieval Funnel', icon: Search },
-    { id: 'sql' as TabType, label: 'SQL Editor', icon: Code2 },
-    { id: 'ml' as TabType, label: 'Feature Space', icon: Brain },
-    { id: 'experiments' as TabType, label: 'CV Experiments', icon: FlaskConical },
-    { id: 'logs' as TabType, label: 'Structured Logs', icon: FileText },
-    { id: 'metrics' as TabType, label: 'System Analytics', icon: TrendingUp },
+    { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'generate' as TabType, label: 'Generate SQL', icon: Sparkles },
+    { id: 'pipeline' as TabType, label: 'Retrieval Pipeline', icon: Search },
+    { id: 'ml' as TabType, label: 'ML Ranker', icon: Brain },
+    { id: 'metrics' as TabType, label: 'Metrics', icon: TrendingUp },
+    { id: 'experiments' as TabType, label: 'Experiment Tracker', icon: FlaskConical },
+    { id: 'logs' as TabType, label: 'Logs', icon: FileText },
+    { id: 'settings' as TabType, label: 'Settings', icon: Sliders },
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] text-[#0F172A] selection:bg-[#2563EB]/10 select-none antialiased">
+    <div className="flex min-h-screen bg-[#F8FAFC] text-[#0F172A] selection:bg-[#2563EB]/10 select-none antialiased font-sans">
       {/* ── Left Sidebar ────────────────────────────────────────── */}
-      <aside className="w-64 border-r border-[#1E293B] bg-[#0B0F19] flex flex-col justify-between">
+      <aside className="w-64 border-r border-[#1E293B] bg-[#0B0F19] flex flex-col justify-between shrink-0">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-8 h-8 rounded-lg bg-[#2563EB] flex items-center justify-center text-white font-semibold text-sm shadow-sm">
@@ -96,7 +101,7 @@ const App: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium rounded-md transition-all ${
                     isActive 
                       ? 'bg-[#2563EB] text-white shadow-sm' 
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -120,7 +125,7 @@ const App: React.FC = () => {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium tracking-wide">
-                  Active (97 Tables Connected)
+                  Active ({healthStatus.num_tables || 97} Tables Connected)
                 </span>
               </>
             ) : healthStatus?.error ? (

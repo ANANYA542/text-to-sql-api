@@ -1,32 +1,37 @@
 
-FROM python:3.11-slim AS builder
+# ── Stage 1: Build React Frontend ──────────────────────────────
+FROM node:20-slim AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
+# ── Stage 2: Python Builder ─────────────────────────────────────
+FROM python:3.11-slim AS python-builder
 WORKDIR /app
-
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Stage 2: Runtime ──────────────────────────────────────────
+# ── Stage 3: Runtime ──────────────────────────────────────────
 FROM python:3.11-slim AS runtime
-
-# Install runtime system dependencies (e.g. libgomp1 for LightGBM/XGBoost)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
+# Copy python dependencies
+COPY --from=python-builder /usr/local /usr/local
 
-# Copy application code
+# Copy application files
 COPY . .
+
+# Copy built frontend assets to the static directory expected by FastAPI
+COPY --from=frontend-builder /app/static /app/app/static
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser \
@@ -41,7 +46,7 @@ EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; r=requests.get('http://localhost:8001/'); exit(0 if r.status_code == 200 else 1)"
+    CMD python -c "import requests; r=requests.get('http://localhost:8001/health'); exit(0 if r.status_code == 200 else 1)"
 
-# Start the application
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8001", "--server.address=0.0.0.0"]
+# Start the application using uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

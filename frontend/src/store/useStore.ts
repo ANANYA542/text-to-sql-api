@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type TabType = 'dashboard' | 'pipeline' | 'sql' | 'ml' | 'experiments' | 'logs' | 'metrics';
+export type TabType = 'dashboard' | 'generate' | 'pipeline' | 'ml' | 'metrics' | 'experiments' | 'logs' | 'settings';
 
 export interface PipelineStatus {
   step: 'idle' | 'expand' | 'retrieve' | 'rerank' | 'ml' | 'generate' | 'validate' | 'complete' | 'failed';
@@ -35,6 +35,16 @@ interface AppState {
   // Telemetry Cache
   healthStatus: any | null;
   setHealthStatus: (health: any) => void;
+
+  // Settings parameters
+  hybridAlpha: number;
+  setHybridAlpha: (alpha: number) => void;
+  confidenceThreshold: number;
+  setConfidenceThreshold: (threshold: number) => void;
+  maxTables: number;
+  setMaxTables: (count: number) => void;
+  activeModel: string;
+  setActiveModel: (model: string) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -60,4 +70,13 @@ export const useStore = create<AppState>((set) => ({
   
   healthStatus: null,
   setHealthStatus: (health) => set({ healthStatus: health }),
+
+  hybridAlpha: 0.6,
+  setHybridAlpha: (alpha) => set({ hybridAlpha: alpha }),
+  confidenceThreshold: 0.85,
+  setConfidenceThreshold: (threshold) => set({ confidenceThreshold: threshold }),
+  maxTables: 5,
+  setMaxTables: (count) => set({ maxTables: count }),
+  activeModel: 'Llama 3.1 70B',
+  setActiveModel: (model) => set({ activeModel: model }),
 }))
